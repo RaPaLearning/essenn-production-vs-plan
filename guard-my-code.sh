@@ -6,7 +6,7 @@ ruff format
 
 echo "🧩 Detect duplicates"
 if command -v npx &> /dev/null; then
-    npx jscpd --gitignore --ignore ".venv" --min-lines 4 --min-tokens 45 --threshold 0 .
+    npx jscpd --gitignore .
 else
     echo "⚠️  ✗ npx not found, skipping jscpd duplicate detection"
     read -p "Do you want to proceed anyway? (y/n) " -n 1 -r
