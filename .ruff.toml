@@ -1,0 +1,7 @@
+line-length = 100
+
+[lint]
+select = ["E", "W", "F", "C901"]
+
+[lint.mccabe]
+max-complexity = 4
