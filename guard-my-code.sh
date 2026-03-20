@@ -1,10 +1,10 @@
 #!/usr/bin/env -S uv run bash
 set -e  # Exit on any error
 
-echo "Format code with ruff"
+echo "🎨 Format code with ruff"
 ruff format
 
-echo "Detect duplicates"
+echo "🧩 Detect duplicates"
 if command -v npx &> /dev/null; then
     npx jscpd --gitignore --ignore ".venv" --min-lines 4 --min-tokens 45 --threshold 0 .
 else
@@ -16,19 +16,19 @@ else
     fi
 fi
 
-echo "Lint python code"
+echo "🔍 Lint python code"
 ruff check .
 
-echo "Check types, unreachable code, uninitialized variables"
+echo "🧠 Check types, unreachable code, uninitialized variables"
 pyright 
 
-echo "Guard against unsecure code patterns"
+echo "🛡️ Guard against unsecure code patterns"
 bandit --exclude ./.venv,./.ruff_cache/ -r .
 
-echo "Guard against secrets in code"
+echo "🔐 Guard against secrets in code"
 git ls-files -z | xargs -0 detect-secrets-hook --baseline .secrets.baseline
 
-echo "Run tests with coverage"
+echo "🧪 Run tests with coverage"
 rm -rf .coverage
 coverage run -p -m unittest discover -s tests
 coverage run -p main.py
@@ -36,5 +36,5 @@ coverage combine
 coverage report --fail-under=100
 coverage html
 
-echo "Audit dependencies"
+echo "📦 Audit dependencies"
 pip-audit .
