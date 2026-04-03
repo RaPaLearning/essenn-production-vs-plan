@@ -1,4 +1,14 @@
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import DBSCAN
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+
 
 df = pd.read_excel("data/sample/DailyProductionReport_17032026.xlsx")
 
@@ -22,15 +32,13 @@ features = features.fillna(features.median())
 
 print("Nulls after filling:", features.isnull().sum().sum())
 
-from sklearn.preprocessing import StandardScaler
+
 
 scaler = StandardScaler()
 features_scaled = scaler.fit_transform(features)
 
 print("Scaled shape:", features_scaled.shape)
 
-import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
 
 # Try K values from 1 to 10 and record how "tight" the clusters are
 # inertia = sum of distances of each point to its cluster center
@@ -94,8 +102,7 @@ print(cluster1["Shift"].value_counts())
 print("\nDown time reasons:")
 print(cluster1["Down Time Reason"].value_counts().head(10))
 
-from sklearn.decomposition import PCA
-import matplotlib.pyplot as plt
+
 
 # PCA reduces our 3 features down to 2 dimensions so we can plot them
 # Think of it as "squishing" 3D data onto a 2D chart while keeping the shape
@@ -127,7 +134,7 @@ plt.savefig("clusters_plot.png")
 print("Cluster plot saved as clusters_plot.png")
 
 
-from sklearn.cluster import DBSCAN
+
 
 # eps = how close two points must be to be considered neighbours
 # min_samples = minimum points needed to form a cluster
@@ -175,9 +182,6 @@ plt.savefig("dbscan_plot.png")
 print("DBSCAN plot saved as dbscan_plot.png")
 
 
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
 
 # We use KMeans clusters as our labels (0=normal, 1=problem, 2=setup heavy)
 X = features_scaled
