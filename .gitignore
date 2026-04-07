@@ -1,7 +1,21 @@
-.venv
-node_modules
-.ruff_cache
-__pycache__
+# Python
+.venv/
+__pycache__/
 *.pyc
-htmlcov
+*.pyo
+*.pyd
+.python-version
+
+# Linting / type caches
+.ruff_cache/
+.mypy_cache/
+.pyright/
+
+# Test & coverage output
+htmlcov/
 .coverage
+.coverage.*
+
+# Node (only npx jscpd is used — no local install needed)
+node_modules/
+package-lock.json
