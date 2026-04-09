@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Factory part plan vs production analytics"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "openpyxl>=3.1",
+]
 
 [dependency-groups]
 dev = [
@@ -18,3 +20,4 @@ dev = [
 
 [tool.pyright]
 typeCheckingMode = "strict"
+reportPrivateUsage = false

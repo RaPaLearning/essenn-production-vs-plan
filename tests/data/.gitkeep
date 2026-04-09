@@ -1,0 +1,2 @@
+# This file keeps the tests/data/ directory tracked by git.
+# Test fixtures that require Excel files use data/sample/ at the repo root.
