@@ -1,8 +1,8 @@
 from typing import Any
-
+import pandas as pd
 all_sheets: list[Any] = []
 all_days: list[Any] = []
-import pandas as pd
+
 df: pd.DataFrame = pd.read_excel("data/sample/DailyProductionReport_17032026.xlsx")
 
 print("\n\n Not Cleaned:( \n")
