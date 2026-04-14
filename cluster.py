@@ -1,12 +1,21 @@
 import pandas as pd
+import numpy as np
 from sklearn.preprocessing import StandardScaler
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import KMeans, DBSCAN
 from sklearn.decomposition import PCA
-import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
+import matplotlib.pyplot as plt
+from numpy.typing import NDArray
+
+# Type hint the scaled features explicitly
+features_scaled: NDArray[np.float64] = scaler.fit_transform(features)
+
+# Type hint coords
+coords: NDArray[np.float64] = pca.fit_transform(features_scaled)
+
+
 
 # Load the data
 df = pd.read_excel("data/sample/DailyProductionReport_17032026.xlsx")

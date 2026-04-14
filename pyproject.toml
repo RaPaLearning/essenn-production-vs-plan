@@ -16,6 +16,7 @@ dev = [
     "bandit>=1.9.4",
     "coverage>=7.13.5",
     "detect-secrets>=1.5.0",
+    "pandas-stubs>=3.0.0.260204",
     "pip-audit>=2.10.0",
     "pyright>=1.1.408",
     "ruff>=0.15.6",
