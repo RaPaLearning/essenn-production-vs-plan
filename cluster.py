@@ -44,7 +44,7 @@ inertia = []
 k_values = range(1, 11)
 
 for k in k_values:
-    km = KMeans(n_clusters=k, random_state=42, n_init=10)
+    km = KMeans(n_clusters=k, random_state=42, n_init="auto")
     km.fit(features_scaled)
     inertia.append(km.inertia_)
 
