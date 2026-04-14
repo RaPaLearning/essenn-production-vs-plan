@@ -1,6 +1,6 @@
 import pandas as pd
+df: pd.DataFrame = pd.read_excel("data/sample/DailyProductionReport_17032026.xlsx")
 
-df = pd.read_excel("data/sample/DailyProductionReport_17032026.xlsx")
 print("\n\n Not Cleaned:( \n")
 print(df["Date"].head(3))
 print(df[["Start Time", "End Time"]].head(3))
