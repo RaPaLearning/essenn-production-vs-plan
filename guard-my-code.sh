@@ -1,8 +1,8 @@
-#!/usr/bin/env -S uv run bash
+#!/usr/bin/env bash
 set -e  # Exit on any error
 
 echo "🎨 Format code with ruff"
-ruff format
+python -m ruff format .
 
 echo "🧩 Detect duplicates"
 if command -v npx &> /dev/null; then

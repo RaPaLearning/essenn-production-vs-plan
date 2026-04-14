@@ -13,7 +13,7 @@ df = pd.read_excel("data/sample/DailyProductionReport_17032026.xlsx")
 
 df["Date"] = pd.to_datetime(df["Date"], format="%Y%m%d")
 df["Start Time"] = pd.to_datetime(df["Start Time"], format="%d-%m-%Y %H:%M:%S")
-df["End Time"]   = pd.to_datetime(df["End Time"],   format="%d-%m-%Y %H:%M:%S")
+df["End Time"] = pd.to_datetime(df["End Time"], format="%d-%m-%Y %H:%M:%S")
 df = df.dropna(axis="columns", how="all")
 
 print(df.shape)
@@ -25,21 +25,21 @@ features = df[["Setting Time Min", "Acp Qty", "Duration Min"]]
 
 print(features.describe())
 print(features.isnull().sum())
- 
- # Filling the nulls
+
+# Filling the nulls
 features = features.fillna(features.median())
 
 print("Nulls after filling:", features.isnull().sum().sum())
 
 
-#Standardizing 
+# Standardizing
 scaler = StandardScaler()
 features_scaled = scaler.fit_transform(features)
 
 print("Scaled shape:", features_scaled.shape)
 
 
-#Plotting an elbow plot to find the bets k value for k means
+# Plotting an elbow plot to find the bets k value for k means
 inertia = []
 k_values = range(1, 11)
 
@@ -82,11 +82,11 @@ print(cluster1["Shift"].value_counts())
 print("\nDown time reasons:")
 print(cluster1["Down Time Reason"].value_counts().head(10))
 
-#using PCA
+# using PCA
 pca = PCA(n_components=2)
 coords = pca.fit_transform(features_scaled)
 
-#KMeans clusters (0=normal, 1=problem, 2=setup heavy)
+# KMeans clusters (0=normal, 1=problem, 2=setup heavy)
 plt.figure(figsize=(9, 6))
 colors = {0: "green", 1: "red", 2: "orange"}
 labels = {0: "Normal (Cluster 0)", 1: "Problem runs (Cluster 1)", 2: "Setup heavy (Cluster 2)"}
@@ -99,7 +99,7 @@ for cluster_id in [0, 1, 2]:
         c=colors[cluster_id],
         label=labels[cluster_id],
         alpha=0.6,
-        s=40
+        s=40,
     )
 
 plt.title("KMeans Clusters — Production Runs")
@@ -119,7 +119,7 @@ print(df["DBSCAN_Cluster"].value_counts().sort_index())
 
 anomalies = df[df["DBSCAN_Cluster"] == -1]
 print(f"\nAnomalies found: {len(anomalies)} out of {len(df)} runs")
-print(f"That's {round(len(anomalies)/len(df)*100, 1)}% of all runs")
+print(f"That's {round(len(anomalies) / len(df) * 100, 1)}% of all runs")
 
 print("\nAnomaly averages:")
 print(anomalies[["Setting Time Min", "Acp Qty", "Duration Min"]].mean().round(2))
@@ -140,7 +140,7 @@ for cluster_id in [-1, 0, 1]:
         c=dbscan_colors[cluster_id],
         label=dbscan_labels[cluster_id],
         alpha=0.6,
-        s=60 if cluster_id == -1 else 40  # make anomalies bigger
+        s=60 if cluster_id == -1 else 40,  # make anomalies bigger
     )
 
 plt.title("DBSCAN — Anomaly Detection on Production Runs")
@@ -156,16 +156,14 @@ X = features_scaled
 y = df["Cluster"]
 
 # Split into training (80%) and testing (20%)
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 rf = RandomForestClassifier(n_estimators=100, random_state=42)
 rf.fit(X_train, y_train)
 y_pred = rf.predict(X_test)
-print(classification_report(y_test, y_pred, 
-      target_names=["Normal", "Problem", "Setup heavy"]))
-importances = pd.Series(rf.feature_importances_, 
-                        index=["Setting Time Min", "Acp Qty", "Duration Min"])
+print(classification_report(y_test, y_pred, target_names=["Normal", "Problem", "Setup heavy"]))
+importances = pd.Series(
+    rf.feature_importances_, index=["Setting Time Min", "Acp Qty", "Duration Min"]
+)
 print("\nFeature importances:")
 print(importances.sort_values(ascending=False).round(3))
 plt.figure(figsize=(7, 4))
