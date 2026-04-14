@@ -9,14 +9,6 @@ from sklearn.metrics import classification_report
 import matplotlib.pyplot as plt
 from numpy.typing import NDArray
 
-# Type hint the scaled features explicitly
-features_scaled: NDArray[np.float64] = scaler.fit_transform(features)
-
-# Type hint coords
-coords: NDArray[np.float64] = pca.fit_transform(features_scaled)
-
-
-
 # Load the data
 df = pd.read_excel("data/sample/DailyProductionReport_17032026.xlsx")
 
@@ -43,10 +35,9 @@ print("Nulls after filling:", features.isnull().sum().sum())
 
 # Standardizing
 scaler = StandardScaler()
-features_scaled = scaler.fit_transform(features)
+features_scaled: NDArray[np.float64] = scaler.fit_transform(features)
 
 print("Scaled shape:", features_scaled.shape)
-
 
 # Plotting an elbow plot to find the bets k value for k means
 inertia = []
@@ -93,7 +84,8 @@ print(cluster1["Down Time Reason"].value_counts().head(10))
 
 # using PCA
 pca = PCA(n_components=2)
-coords = pca.fit_transform(features_scaled)
+# Type hint coords
+coords: NDArray[np.float64] = pca.fit_transform(features_scaled)
 
 # KMeans clusters (0=normal, 1=problem, 2=setup heavy)
 plt.figure(figsize=(9, 6))
