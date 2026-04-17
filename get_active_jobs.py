@@ -126,4 +126,4 @@ def export_active_jobs(input_path: str, date_str: str, output_path: str) -> None
         rows.extend(_process_sheet_with_machine(df, target, active_jobs))
 
     result: pd.DataFrame = pd.DataFrame(rows, columns=["Order No.", "Machine"])
-    result.to_excel(output_path, index=False)
+    result.to_excel(output_path, index=False)  # type: ignore[reportUnknownMemberType]
