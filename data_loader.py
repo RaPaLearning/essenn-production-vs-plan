@@ -3,11 +3,14 @@ import pandas as pd
 
 
 def load_production_report() -> pd.DataFrame:
-    df = pd.read_excel("data/sample/DailyProductionReport_17032026.xlsx")
+    df: pd.DataFrame = pd.read_excel(
+        "data/sample/DailyProductionReport_17032026.xlsx"
+    )
+    df = df.dropna(axis="columns", how="all")
+    
     df["Date"] = pd.to_datetime(df["Date"], format="%Y%m%d")
     df["Start Time"] = pd.to_datetime(df["Start Time"], format="%d-%m-%Y %H:%M:%S")
     df["End Time"] = pd.to_datetime(df["End Time"], format="%d-%m-%Y %H:%M:%S")
-    df = df.dropna(axis="columns", how="all")
     return df
 
 
