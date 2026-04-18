@@ -4,14 +4,10 @@ from numpy.typing import NDArray
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.decomposition import PCA
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
-from data_loader import load_production_report
-
-from plot import plot_elbow, plot_clusters, plot_feature_importance, run_classification
-
 from data_loader import load_production_report, prepare_features
+from plot import plot_elbow, plot_clusters, run_classification
+
+
 
 df: pd.DataFrame = load_production_report()
 print(df.shape)
