@@ -12,9 +12,6 @@ from plot import plot_elbow, plot_clusters, plot_feature_importance
 
 # Load and prepare
 df: pd.DataFrame = load_production_report()
-df["Date"] = pd.to_datetime(df["Date"], format="%Y%m%d")
-df["Start Time"] = pd.to_datetime(df["Start Time"], format="%d-%m-%Y %H:%M:%S")
-df["End Time"] = pd.to_datetime(df["End Time"], format="%d-%m-%Y %H:%M:%S")
 
 print(df.shape)
 print(df.columns.tolist())
