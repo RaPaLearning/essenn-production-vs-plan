@@ -3,7 +3,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from numpy.typing import NDArray
-
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
 
 def plot_elbow(k_values: range, inertia: list[float]) -> None:
     plt.figure(figsize=(8, 4))
@@ -56,3 +58,23 @@ def plot_feature_importance(importances: pd.Series) -> None:
     plt.tight_layout()
     plt.savefig("feature_importance.png")
     print("Feature importance plot saved")
+
+def run_classification(
+    features_scaled: NDArray[np.float64],
+    y: pd.Series,
+) -> None:
+    X_train, X_test, y_train, y_test = train_test_split(
+        features_scaled, y, test_size=0.2, random_state=42
+    )
+    rf = RandomForestClassifier(n_estimators=100, random_state=42)
+    rf.fit(X_train, y_train)
+    y_pred = rf.predict(X_test)
+    print(classification_report(y_test, y_pred, target_names=["Normal", "Problem", "Setup heavy"]))
+
+    importances: pd.Series = pd.Series(
+        rf.feature_importances_,
+        index=["Setting Time Min", "Acp Qty", "Duration Min"],
+    )
+    print("\nFeature importances:")
+    print(importances.sort_values(ascending=False).round(3))
+    plot_feature_importance(importances)

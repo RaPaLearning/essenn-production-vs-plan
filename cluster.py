@@ -8,29 +8,25 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 from data_loader import load_production_report
-from plot import plot_elbow, plot_clusters, plot_feature_importance
 
-# Load and prepare
+from plot import plot_elbow, plot_clusters, plot_feature_importance, run_classification
+
+from data_loader import load_production_report, prepare_features
+
 df: pd.DataFrame = load_production_report()
-
 print(df.shape)
 print(df.columns.tolist())
 
-# Feature engineering
-df["Duration Min"] = (
-    df["End Time"] - df["Start Time"]
-).dt.total_seconds() / 60
-
-features: pd.DataFrame = df[["Setting Time Min", "Acp Qty", "Duration Min"]]
+features: pd.DataFrame = prepare_features(df)
 print(features.describe())
-print(features.isnull().sum())
+print("Nulls after filling:", features.isnull().sum().sum())
 
 features = features.fillna(features.median())
 print("Nulls after filling:", features.isnull().sum().sum())
 
 # Scale
 scaler = StandardScaler()
-features_scaled: NDArray[np.float64] = scaler.fit_transform(features)
+features_scaled: NDArray[np.float64] = scaler.fit_transform(features)  # type: ignore
 print("Scaled shape:", features_scaled.shape)
 
 # Elbow method
@@ -100,20 +96,6 @@ plot_clusters(
 )
 
 # Classification
-X: NDArray[np.float64] = features_scaled
-y: pd.Series = df["Cluster"]
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
-rf = RandomForestClassifier(n_estimators=100, random_state=42)
-rf.fit(X_train, y_train)
-y_pred = rf.predict(X_test)
-print(classification_report(y_test, y_pred, target_names=["Normal", "Problem", "Setup heavy"]))
 
-importances: pd.Series = pd.Series(
-    rf.feature_importances_,
-    index=["Setting Time Min", "Acp Qty", "Duration Min"],
-)
-print("\nFeature importances:")
-print(importances.sort_values(ascending=False).round(3))
-plot_feature_importance(importances)
+# at the bottom of cluster.py, replace everything after "# Classification"
+run_classification(features_scaled, df["Cluster"])

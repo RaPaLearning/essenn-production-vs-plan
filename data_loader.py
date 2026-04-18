@@ -1,13 +1,12 @@
 # type: ignore
 import pandas as pd
 
-
 def load_production_report() -> pd.DataFrame:
     df: pd.DataFrame = pd.read_excel(
         "data/sample/DailyProductionReport_17032026.xlsx"
     )
     df = df.dropna(axis="columns", how="all")
-    
+
     df["Date"] = pd.to_datetime(df["Date"], format="%Y%m%d")
     df["Start Time"] = pd.to_datetime(df["Start Time"], format="%d-%m-%Y %H:%M:%S")
     df["End Time"] = pd.to_datetime(df["End Time"], format="%d-%m-%Y %H:%M:%S")
@@ -38,3 +37,11 @@ def load_operations_by_day() -> pd.DataFrame:
         df_sheet.insert(0, "Date", date_val)
         all_days.append(df_sheet)
     return pd.concat(all_days, ignore_index=True)
+
+def prepare_features(df: pd.DataFrame) -> pd.DataFrame:
+    df["Duration Min"] = (
+        df["End Time"] - df["Start Time"]
+    ).dt.total_seconds() / 60
+    features: pd.DataFrame = df[["Setting Time Min", "Acp Qty", "Duration Min"]]
+    features = features.fillna(features.median())
+    return features
