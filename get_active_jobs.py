@@ -49,19 +49,6 @@ def _process_sheet(df: pd.DataFrame, target: datetime.date) -> list[dict[str, st
     return results
 
 
-def get_active_jobs(file_path: str, date_str: str) -> list[str]:
-    """Return the list of active job order numbers for the given date."""
-    target: datetime.date = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
-    sheets: dict[str, pd.DataFrame] = pd.read_excel(  # type: ignore[reportUnknownMemberType]
-        file_path, sheet_name=None, header=None
-    )
-
-    result: list[str] = []
-    for df in sheets.values():
-        result.extend(r["Order No."] for r in _process_sheet(df, target))
-    return result
-
-
 def export_active_jobs(input_path: str, date_str: str, output_path: str) -> None:
     """Export active jobs with machine names for a given date to an Excel file."""
     target: datetime.date = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()

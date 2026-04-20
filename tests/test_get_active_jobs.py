@@ -7,28 +7,12 @@ import pandas as pd
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from get_active_jobs import export_active_jobs, get_active_jobs
+from get_active_jobs import export_active_jobs
 
 FIXTURE = "tests/fixtures/test_operations.xlsx"
 
 
 class TestGetActiveJobs(unittest.TestCase):
-    # --- get_active_jobs ---
-
-    def test_jobs_spanning_date(self) -> None:
-        jobs = get_active_jobs(FIXTURE, "2026-03-10")
-        self.assertIn("J2602-0028", jobs)
-        self.assertIn("J2601-0054", jobs)
-        self.assertIn("J2603-0072/97", jobs)
-
-    def test_job_not_spanning_date(self) -> None:
-        jobs = get_active_jobs(FIXTURE, "2026-03-20")
-        self.assertNotIn("J2602-0020", jobs)
-
-    def test_empty_date_returns_nothing(self) -> None:
-        jobs = get_active_jobs(FIXTURE, "2026-01-01")
-        self.assertEqual(jobs, [])
-
     # --- edge cases for 100% coverage via public API ---
 
     def test_edge_cases_in_temp_file(self) -> None:
@@ -66,8 +50,12 @@ class TestGetActiveJobs(unittest.TestCase):
                 df1.to_excel(writer, sheet_name="Sheet1", index=False, header=False)  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
                 df2.to_excel(writer, sheet_name="Sheet2", index=False, header=False)  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
 
-            jobs = get_active_jobs(tmp_path, "2026-03-12")
-            self.assertEqual(jobs, [])
+            with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as out:
+                out_path: str = out.name
+            export_active_jobs(tmp_path, "2026-03-12", out_path)
+            result: pd.DataFrame = pd.read_excel(out_path)  # type: ignore[reportUnknownMemberType]
+            self.assertEqual(len(result), 0)
+            os.remove(out_path)
         finally:
             os.remove(tmp_path)
 
