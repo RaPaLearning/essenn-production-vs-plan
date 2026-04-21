@@ -89,3 +89,10 @@ Install python dependencies:
 ```bash
 uv sync
 ```
+
+## Running the Code
+
+To generate the output Excel file, simply run:
+```bash
+python test_export.py
+```
