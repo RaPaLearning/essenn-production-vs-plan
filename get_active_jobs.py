@@ -1,5 +1,5 @@
 import datetime
-from typing import Any  # noqa: F401
+from typing import Any
 import pandas as pd
 
 

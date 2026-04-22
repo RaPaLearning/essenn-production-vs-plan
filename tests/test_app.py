@@ -18,12 +18,11 @@ class TestApp(unittest.TestCase):
         self.assertEqual(at.title[0].value, "📊 Operations Extractor")
 
         # Verify baseline UI state (no download button should be shown initially)
-        unknown_elements_count_start = sum(
-            1 for e in at.main if getattr(e, "type", type(e).__name__) == "UnknownElement"
+        has_unknown_elements = any(
+            getattr(e, "type", type(e).__name__) == "UnknownElement" for e in at.main
         )
-        self.assertEqual(
-            unknown_elements_count_start,
-            0,
+        self.assertFalse(
+            has_unknown_elements,
             "Download button element should not exist before an upload is completed",
         )
 
@@ -50,12 +49,11 @@ class TestApp(unittest.TestCase):
         # The main validation: check if the download button (UnknownElement subtype)
         # was appended to the bottom and it only renders if the file processing runs completely
         # without hitting earlier exceptions and correctly saves bytes to session_state.
-        download_buttons_count = sum(
-            1 for e in at.main if getattr(e, "type", type(e).__name__) == "download_button"
+        has_download_button = any(
+            getattr(e, "type", type(e).__name__) == "download_button" for e in at.main
         )
-        self.assertGreater(
-            download_buttons_count,
-            0,
+        self.assertTrue(
+            has_download_button,
             "Download button element was not rendered into the tree (processing failed)",
         )
 
@@ -89,11 +87,11 @@ class TestApp(unittest.TestCase):
         )
 
         # The download button must NOT exist.
-        download_buttons_count = sum(
-            1 for e in at.main if getattr(e, "type", type(e).__name__) == "download_button"
+        has_download_button = any(
+            getattr(e, "type", type(e).__name__) == "download_button" for e in at.main
         )
-        self.assertEqual(
-            download_buttons_count, 0, "A download button was improperly rendered after a failure"
+        self.assertFalse(
+            has_download_button, "A download button was improperly rendered after a failure"
         )
 
 

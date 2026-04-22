@@ -23,7 +23,7 @@ echo "🧠 Check types, unreachable code, uninitialized variables"
 pyright 
 
 echo "🦅 Detect dead code"
-vulture --exclude .venv .
+vulture --exclude .venv . --min-confidence 100
 
 echo "🛡️ Guard against unsecure code patterns"
 bandit --exclude ./.venv,./.ruff_cache/ -r .
