@@ -25,6 +25,8 @@ class TestApp(unittest.TestCase):
             has_unknown_elements,
             "Download button element should not exist before an upload is completed",
         )
+        self.assertEqual(len(at.subheader), 0, "Preview subheader should not exist initially")
+        self.assertEqual(len(at.dataframe), 0, "Dataframe preview should not exist initially")
 
         # Find sample data
         sample_path = "data/sample/OperationsByDay.xlsx"
@@ -56,6 +58,11 @@ class TestApp(unittest.TestCase):
             has_download_button,
             "Download button element was not rendered into the tree (processing failed)",
         )
+
+        # Verify the preview subheader and dataframe element are rendered successfully
+        self.assertGreater(len(at.subheader), 0, "Preview subheader should be rendered")
+        self.assertEqual(at.subheader[0].value, "Preview Summary")
+        self.assertGreater(len(at.dataframe), 0, "Dataframe preview should be rendered")
 
     def test_app_handles_invalid_file(self):
         """Test that uploading a completely invalid file gets caught naturally.
@@ -92,6 +99,14 @@ class TestApp(unittest.TestCase):
         )
         self.assertFalse(
             has_download_button, "A download button was improperly rendered after a failure"
+        )
+
+        # The preview components must NOT exist
+        self.assertEqual(
+            len(at.subheader), 0, "Preview subheader should not be rendered after a failure"
+        )
+        self.assertEqual(
+            len(at.dataframe), 0, "Dataframe preview should not be rendered after a failure"
         )
 
 

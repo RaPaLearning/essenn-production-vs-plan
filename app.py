@@ -6,6 +6,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 import streamlit as st
 import tempfile
 from datetime import date, datetime
+import io
+import pandas as pd
 
 from get_active_jobs import export_active_jobs
 
@@ -50,6 +52,11 @@ def main() -> None:
                     return
 
         mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+        st.subheader("Preview Summary")
+        preview_df: pd.DataFrame = pd.read_excel(io.BytesIO(st.session_state[state_key]))  # type: ignore[reportUnknownMemberType]
+        st.dataframe(preview_df, width="stretch")
+
         st.download_button(
             label="Download Summary Report",
             data=st.session_state[state_key],
