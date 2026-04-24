@@ -1,6 +1,6 @@
 {
   "threshold": 0,
-  "ignore": ["**/.venv/**", "**/node_modules/**", "**/.ruff_cache/**", "**/.git/**", "**/htmlcov/**", "**/.coverage/**"],
+  "ignore": ["**/.venv/**", "**/node_modules/**", "**/.ruff_cache/**", "**/.git/**", "**/htmlcov/**", "**/.coverage/**", "**/graphify-out/**"],
   "minLines": 4,
   "minTokens": 45
 }

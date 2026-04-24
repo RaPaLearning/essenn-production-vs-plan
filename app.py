@@ -53,16 +53,16 @@ def main() -> None:
 
         mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-        st.subheader("Preview Summary")
-        preview_df: pd.DataFrame = pd.read_excel(io.BytesIO(st.session_state[state_key]))  # type: ignore[reportUnknownMemberType]
-        st.dataframe(preview_df, width="stretch")
-
         st.download_button(
             label="Download Summary Report",
             data=st.session_state[state_key],
             file_name=f"operations_summary_{selected_date}.xlsx",
             mime=mime_type,
         )
+
+        st.subheader("Preview Summary")
+        preview_df: pd.DataFrame = pd.read_excel(io.BytesIO(st.session_state[state_key]))  # type: ignore[reportUnknownMemberType]
+        st.dataframe(preview_df, width="stretch")
 
 
 if __name__ == "__main__":
