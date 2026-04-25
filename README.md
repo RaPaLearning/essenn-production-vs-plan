@@ -92,7 +92,7 @@ uv sync
 
 ## Running the Code
 
-To generate the output Excel file, simply run:
+Run the command in your terminal and open the link displayed in your browser 
 ```bash
-python test_export.py
+uv run streamlit run app.py
 ```
