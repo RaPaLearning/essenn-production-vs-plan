@@ -1,0 +1,90 @@
+import os
+import sys
+import tempfile
+import unittest
+
+import pandas as pd
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from get_active_jobs import export_active_jobs
+
+FIXTURE = "tests/fixtures/test_operations.xlsx"
+
+
+class TestGetActiveJobs(unittest.TestCase):
+    # --- edge cases for 100% coverage via public API ---
+
+    def test_edge_cases_in_temp_file(self) -> None:
+        data: list[list[object]] = []
+        for _ in range(5):
+            data.append([None] * 12)  # Headers
+
+        # Row 5: Missing order
+        r1: list[object] = [None] * 12
+        r1[8] = "10/03/2026"
+        r1[10] = "15/03/2026"
+        data.append(r1)
+
+        # Row 6: Missing start
+        r2: list[object] = [None] * 12
+        r2[0] = "J001"
+        r2[10] = "15/03/2026"
+        data.append(r2)
+
+        # Row 7: Unparseable date
+        r3: list[object] = [None] * 12
+        r3[0] = "J002"
+        r3[8] = "bad-date"
+        r3[10] = "15/03/2026"
+        data.append(r3)
+
+        df1 = pd.DataFrame(data)
+        df2 = pd.DataFrame([[1, 2, 3]])  # Less than 6 rows
+
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+            tmp_path: str = tmp.name
+
+        try:
+            with pd.ExcelWriter(tmp_path) as writer:  # type: ignore[reportUnknownVariableType]
+                df1.to_excel(writer, sheet_name="Sheet1", index=False, header=False)  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+                df2.to_excel(writer, sheet_name="Sheet2", index=False, header=False)  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+
+            with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as out:
+                out_path: str = out.name
+            export_active_jobs(tmp_path, "2026-03-12", out_path)
+            result: pd.DataFrame = pd.read_excel(out_path)  # type: ignore[reportUnknownMemberType]
+            self.assertEqual(len(result), 0)
+            os.remove(out_path)
+        finally:
+            os.remove(tmp_path)
+
+    # --- export_active_jobs ---
+
+    def test_export_creates_file_with_jobs(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+            tmp_path: str = tmp.name
+
+        try:
+            export_active_jobs(FIXTURE, "2026-03-10", tmp_path)
+            result: pd.DataFrame = pd.read_excel(tmp_path)  # type: ignore[reportUnknownMemberType]
+            self.assertIn("Order No.", result.columns)  # type: ignore[reportUnknownMemberType]
+            self.assertIn("Machine", result.columns)  # type: ignore[reportUnknownMemberType]
+            self.assertGreater(len(result), 0)
+        finally:
+            os.remove(tmp_path)
+
+    def test_export_empty_date_creates_empty_file(self) -> None:
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+            tmp_path: str = tmp.name
+
+        try:
+            export_active_jobs(FIXTURE, "2026-01-01", tmp_path)
+            result: pd.DataFrame = pd.read_excel(tmp_path)  # type: ignore[reportUnknownMemberType]
+            self.assertEqual(len(result), 0)
+        finally:
+            os.remove(tmp_path)
+
+
+if __name__ == "__main__":
+    unittest.main()  # pragma: no cover

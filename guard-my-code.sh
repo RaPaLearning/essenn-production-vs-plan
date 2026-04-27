@@ -22,6 +22,9 @@ ruff check .
 echo "🧠 Check types, unreachable code, uninitialized variables"
 pyright 
 
+echo "🦅 Detect dead code"
+vulture --exclude .venv . --min-confidence 100
+
 echo "🛡️ Guard against unsecure code patterns"
 bandit --exclude ./.venv,./.ruff_cache/ -r .
 
@@ -31,7 +34,6 @@ git ls-files -z | xargs -0 detect-secrets-hook --baseline .secrets.baseline
 echo "🧪 Run tests with coverage"
 rm -rf .coverage
 coverage run -p -m unittest discover -s tests
-coverage run -p main.py
 coverage combine
 coverage report --fail-under=100
 coverage html
