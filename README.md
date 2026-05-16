@@ -89,3 +89,15 @@ Install python dependencies:
 ```bash
 uv sync
 ```
+
+For testing the app
+
+```bash
+uv run bash guard-my-code.sh
+```
+
+Run the app
+
+```bash
+uv run app.py
+```
