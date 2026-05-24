@@ -407,7 +407,8 @@ def export_active_jobs(input_path: str, date_str: str, output_path: str) -> None
 
     # Configure Shift I on the default first sheet
     ws_shift1 = wb.active
-    assert ws_shift1 is not None
+    if ws_shift1 is None:
+        raise TypeError("Workbook has no active sheet")
     ws_shift1.title = "Shift I"  # type: ignore[reportUnknownMemberType]
     _fill_shift_sheet(ws_shift1, "1st", target, rows)
 
