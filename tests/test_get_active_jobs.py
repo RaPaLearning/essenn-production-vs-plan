@@ -53,8 +53,11 @@ class TestGetActiveJobs(unittest.TestCase):
             with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as out:
                 out_path: str = out.name
             export_active_jobs(tmp_path, "2026-03-12", out_path)
-            result: pd.DataFrame = pd.read_excel(out_path)  # type: ignore[reportUnknownMemberType]
-            self.assertEqual(len(result), 0)
+            result: pd.DataFrame = pd.read_excel(out_path, header=5)  # type: ignore[reportUnknownMemberType]
+            # No active jobs: 5 rows (sub-header, fallback, blanks, sign)
+            self.assertEqual(len(result), 5)
+            fallback = str(result.iloc[1]['MACHINE']).strip()
+            self.assertEqual(fallback, "No active jobs scheduled for this shift")
             os.remove(out_path)
         finally:
             os.remove(tmp_path)
@@ -67,9 +70,9 @@ class TestGetActiveJobs(unittest.TestCase):
 
         try:
             export_active_jobs(FIXTURE, "2026-03-10", tmp_path)
-            result: pd.DataFrame = pd.read_excel(tmp_path)  # type: ignore[reportUnknownMemberType]
-            self.assertIn("Order No.", result.columns)  # type: ignore[reportUnknownMemberType]
-            self.assertIn("Machine", result.columns)  # type: ignore[reportUnknownMemberType]
+            result: pd.DataFrame = pd.read_excel(tmp_path, header=5)  # type: ignore[reportUnknownMemberType]
+            self.assertIn("JOB ORDER No", result.columns)  # type: ignore[reportUnknownMemberType]
+            self.assertIn("MACHINE", result.columns)  # type: ignore[reportUnknownMemberType]
             self.assertGreater(len(result), 0)
         finally:
             os.remove(tmp_path)
@@ -80,8 +83,10 @@ class TestGetActiveJobs(unittest.TestCase):
 
         try:
             export_active_jobs(FIXTURE, "2026-01-01", tmp_path)
-            result: pd.DataFrame = pd.read_excel(tmp_path)  # type: ignore[reportUnknownMemberType]
-            self.assertEqual(len(result), 0)
+            result: pd.DataFrame = pd.read_excel(tmp_path, header=5)  # type: ignore[reportUnknownMemberType]
+            self.assertEqual(len(result), 5)
+            fallback = str(result.iloc[1]['MACHINE']).strip()
+            self.assertEqual(fallback, "No active jobs scheduled for this shift")
         finally:
             os.remove(tmp_path)
 
