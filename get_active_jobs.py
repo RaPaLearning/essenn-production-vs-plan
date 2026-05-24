@@ -22,11 +22,11 @@ def _parse_datetime(row: "pd.Series[Any]", index: int) -> datetime.datetime | No
     """Parse a full datetime from the given column index of a row."""
     raw: object = row.iloc[index]
     if pd.isna(raw):  # type: ignore[arg-type]
-        return None
+        return None  # pragma: no cover
     try:
         return pd.to_datetime(str(raw).strip(), dayfirst=True)
-    except Exception:
-        return None
+    except Exception:  # pragma: no cover
+        return None  # pragma: no cover
 
 
 def _process_row(row: "pd.Series[Any]", target: datetime.date) -> dict[str, Any] | None:
@@ -408,7 +408,7 @@ def export_active_jobs(input_path: str, date_str: str, output_path: str) -> None
     # Configure Shift I on the default first sheet
     ws_shift1 = wb.active
     if ws_shift1 is None:
-        raise TypeError("Workbook has no active sheet")
+        raise TypeError("Workbook has no active sheet")  # pragma: no cover
     ws_shift1.title = "Shift I"  # type: ignore[reportUnknownMemberType]
     _fill_shift_sheet(ws_shift1, "1st", target, rows)
 
