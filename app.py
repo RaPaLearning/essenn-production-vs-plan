@@ -68,16 +68,19 @@ def main() -> None:
         )
         # Keep only the 7 data columns from the issue scope
         keep_cols = [
-            "MACHINE", "JOB ORDER No", "TOTAL QTY", "PART NO",
-            "PART NAME", "OPERATION", "PLAN QTY",
+            "MACHINE",
+            "JOB ORDER No",
+            "TOTAL QTY",
+            "PART NO",
+            "PART NAME",
+            "OPERATION",
+            "PLAN QTY",
         ]
         preview_df = preview_df[[c for c in keep_cols if c in preview_df.columns]]
         # Drop rows that are not actual job data (sub-headers, blanks, signature rows)
         preview_df = preview_df.dropna(subset=["JOB ORDER No"])
         preview_df = preview_df[
-            ~preview_df["JOB ORDER No"]
-            .astype(str)
-            .str.contains("Sign|None|OK|Rej", na=True)
+            ~preview_df["JOB ORDER No"].astype(str).str.contains("Sign|None|OK|Rej", na=True)
         ]
         preview_df = preview_df.reset_index(drop=True)
         st.dataframe(preview_df, width="stretch")
