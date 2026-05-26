@@ -31,7 +31,3 @@ class TestComputePlanQty(unittest.TestCase):
         end = datetime.datetime(2026, 3, 10, 6, 0)  # end before start
         # speed = 240 / 24 = 10, plan = 80
         self.assertEqual(compute_plan_qty(240.0, start, end), 80)
-
-
-if __name__ == "__main__":
-    unittest.main()  # pragma: no cover
