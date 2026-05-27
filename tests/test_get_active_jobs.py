@@ -5,9 +5,11 @@ import unittest
 
 import pandas as pd
 
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from get_active_jobs import export_active_jobs
+from get_active_jobs import _parse_datetime  # type: ignore[reportPrivateUsage]
+from write_active_jobs import export_active_jobs
 
 FIXTURE = "tests/fixtures/test_operations.xlsx"
 
@@ -45,19 +47,22 @@ class TestGetActiveJobs(unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
             tmp_path: str = tmp.name
 
+        out_path: str = ""
         try:
             with pd.ExcelWriter(tmp_path) as writer:  # type: ignore[reportUnknownVariableType]
                 df1.to_excel(writer, sheet_name="Sheet1", index=False, header=False)  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
                 df2.to_excel(writer, sheet_name="Sheet2", index=False, header=False)  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
 
             with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as out:
-                out_path: str = out.name
+                out_path = out.name
             export_active_jobs(tmp_path, "2026-03-12", out_path)
-            result: pd.DataFrame = pd.read_excel(out_path)  # type: ignore[reportUnknownMemberType]
-            self.assertEqual(len(result), 0)
-            os.remove(out_path)
+            result: pd.DataFrame = pd.read_excel(out_path, header=5)  # type: ignore[reportUnknownMemberType]
+            # No active jobs: 5 rows (sub-header, fallback, blanks, sign)
+            self.assertEqual(len(result), 5)
+            self.assertEqual(result.iloc[1]["MACHINE"], "No active jobs scheduled for this shift")
         finally:
             os.remove(tmp_path)
+            os.remove(out_path)
 
     # --- export_active_jobs ---
 
@@ -67,9 +72,9 @@ class TestGetActiveJobs(unittest.TestCase):
 
         try:
             export_active_jobs(FIXTURE, "2026-03-10", tmp_path)
-            result: pd.DataFrame = pd.read_excel(tmp_path)  # type: ignore[reportUnknownMemberType]
-            self.assertIn("Order No.", result.columns)  # type: ignore[reportUnknownMemberType]
-            self.assertIn("Machine", result.columns)  # type: ignore[reportUnknownMemberType]
+            result: pd.DataFrame = pd.read_excel(tmp_path, header=5)  # type: ignore[reportUnknownMemberType]
+            self.assertIn("JOB ORDER No", result.columns)  # type: ignore[reportUnknownMemberType]
+            self.assertIn("MACHINE", result.columns)  # type: ignore[reportUnknownMemberType]
             self.assertGreater(len(result), 0)
         finally:
             os.remove(tmp_path)
@@ -80,11 +85,22 @@ class TestGetActiveJobs(unittest.TestCase):
 
         try:
             export_active_jobs(FIXTURE, "2026-01-01", tmp_path)
-            result: pd.DataFrame = pd.read_excel(tmp_path)  # type: ignore[reportUnknownMemberType]
-            self.assertEqual(len(result), 0)
+            result: pd.DataFrame = pd.read_excel(tmp_path, header=5)  # type: ignore[reportUnknownMemberType]
+            self.assertEqual(len(result), 5)
+            self.assertEqual(result.iloc[1]["MACHINE"], "No active jobs scheduled for this shift")
         finally:
             os.remove(tmp_path)
 
+    # --- _parse_datetime branch coverage (no pragma: no cover) ---
 
-if __name__ == "__main__":
-    unittest.main()  # pragma: no cover
+    def test_parse_datetime_returns_none_for_nan(self) -> None:
+        """Cover the pd.isna branch in _parse_datetime."""
+        row = pd.Series([None] * 12)
+        result = _parse_datetime(row, 0)
+        self.assertIsNone(result)
+
+    def test_parse_datetime_returns_none_for_bad_value(self) -> None:
+        """Cover the Exception branch in _parse_datetime."""
+        row = pd.Series(["not-a-date"] * 12)
+        result = _parse_datetime(row, 0)
+        self.assertIsNone(result)

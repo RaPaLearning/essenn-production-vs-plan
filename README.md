@@ -61,15 +61,11 @@ See samples [pictures here](https://drive.google.com/drive/folders/1_-o4STkU5P5Q
 ## Expected data-flow
 
 1. Data entry (out of scope)
-1. Factory employee exports Excel files: planning + production
-1. Factory employee uploads Excel files to Google Drive after the night shift
-1. Schedule the script to run at 8am:
-    1. Download Excel files from Google Drive
-    1. Clean the data to a standard schema
-    1. Detect anomalies
-    1. Create report
-    1. Send report to supervisor in email + agent to summarize
-    1. Clean-up and shut down
+1. Factory employee exports Excel file from OpCenter: Operations by day
+1. Factory employee uploads Operations by day to this tool
+1. Tool triggers a download of the plan-template for the day
+1. Factory employee uploads the filled-in template, along with the Daily Production Report (from TPM-Trak)
+1. This tool reports the mismatches between plan and production
 
 ## Enhancements to the report
 
