@@ -108,7 +108,3 @@ class TestApp(unittest.TestCase):
         self.assertEqual(
             len(at.dataframe), 0, "Dataframe preview should not be rendered after a failure"
         )
-
-
-if __name__ == "__main__":
-    unittest.main()  # pragma: no cover
