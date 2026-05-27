@@ -59,12 +59,10 @@ class TestGetActiveJobs(unittest.TestCase):
             result: pd.DataFrame = pd.read_excel(out_path, header=5)  # type: ignore[reportUnknownMemberType]
             # No active jobs: 5 rows (sub-header, fallback, blanks, sign)
             self.assertEqual(len(result), 5)
-            fallback = str(result.iloc[1]["MACHINE"]).strip()
-            self.assertEqual(fallback, "No active jobs scheduled for this shift")
+            self.assertEqual(result.iloc[1]["MACHINE"], "No active jobs scheduled for this shift")
         finally:
             os.remove(tmp_path)
-            if out_path and os.path.exists(out_path):
-                os.remove(out_path)
+            os.remove(out_path)
 
     # --- export_active_jobs ---
 
@@ -89,8 +87,7 @@ class TestGetActiveJobs(unittest.TestCase):
             export_active_jobs(FIXTURE, "2026-01-01", tmp_path)
             result: pd.DataFrame = pd.read_excel(tmp_path, header=5)  # type: ignore[reportUnknownMemberType]
             self.assertEqual(len(result), 5)
-            fallback = str(result.iloc[1]["MACHINE"]).strip()
-            self.assertEqual(fallback, "No active jobs scheduled for this shift")
+            self.assertEqual(result.iloc[1]["MACHINE"], "No active jobs scheduled for this shift")
         finally:
             os.remove(tmp_path)
 
