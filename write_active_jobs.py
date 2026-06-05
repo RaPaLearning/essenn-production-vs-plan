@@ -4,6 +4,7 @@ import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from get_active_jobs import get_active_jobs
+from setup_cycle_times import CycleTimeLookup, load_cycle_times
 
 
 def _make_border(
@@ -317,10 +318,20 @@ def _fill_shift_sheet(
     _write_footer(ws, last_row)  # type: ignore[reportUnknownArgumentType]
 
 
-def export_active_jobs(input_path: str, date_str: str, output_path: str) -> None:
+def export_active_jobs(
+    input_path: str,
+    date_str: str,
+    output_path: str,
+    masterlist_path: str | None = None,
+) -> None:
     """Export active jobs and pre-fill shift-wise template sheets to the output Excel file."""
     target_date: datetime.date = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
-    rows = get_active_jobs(input_path, date_str)
+
+    cycle_lookup: CycleTimeLookup | None = None
+    if masterlist_path is not None:
+        cycle_lookup = load_cycle_times(masterlist_path)
+
+    rows = get_active_jobs(input_path, date_str, cycle_lookup)
 
     # Save workbook with exactly the three shift sheets
     wb = openpyxl.Workbook()
@@ -331,13 +342,16 @@ def export_active_jobs(input_path: str, date_str: str, output_path: str) -> None
         cast(openpyxl.worksheet.worksheet.Worksheet, wb.active)  # type: ignore[reportUnknownMemberType]
     )
     ws_shift1.title = "Shift I"  # type: ignore[reportUnknownMemberType]
-    _fill_shift_sheet(ws_shift1, "1st", target_date, rows)  # type: ignore[reportUnknownArgumentType]
+    rows_s1 = [r for r in rows if r.get("Shift") == "Shift I"]
+    _fill_shift_sheet(ws_shift1, "1st", target_date, rows_s1)  # type: ignore[reportUnknownArgumentType]
 
     # Create Shift II and III sheets
     ws_shift2 = wb.create_sheet(title="Shift II")  # type: ignore[reportUnknownMemberType]
-    _fill_shift_sheet(ws_shift2, "2nd", target_date, rows)
+    rows_s2 = [r for r in rows if r.get("Shift") == "Shift II"]
+    _fill_shift_sheet(ws_shift2, "2nd", target_date, rows_s2)
 
     ws_shift3 = wb.create_sheet(title="Shift III")  # type: ignore[reportUnknownMemberType]
-    _fill_shift_sheet(ws_shift3, "3rd", target_date, rows)
+    rows_s3 = [r for r in rows if r.get("Shift") == "Shift III"]
+    _fill_shift_sheet(ws_shift3, "3rd", target_date, rows_s3)
 
     wb.save(output_path)  # type: ignore[reportUnknownMemberType]
