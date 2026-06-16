@@ -75,20 +75,23 @@ def _resolve_cycle_time(
     return get_cycle_minutes(cycle_lookup, part_no, op_name)
 
 
+def _base_record(fields: dict[str, Any]) -> dict[str, Any]:
+    """Return the base dictionary common to all records and anomalies."""
+    return {
+        "Machine": fields["machine"],
+        "Job Order No": fields["order"],
+        "Total Qty": int(fields["qty"]),
+        "Part No": fields["part_no"],
+        "Part Name": fields["product"],
+        "Operation": fields["op_name"],
+    }
+
+
 def _make_lookup_anomalies(fields: dict[str, Any]) -> list[dict[str, Any]]:
     """Create anomaly records for all shifts when part is not in master list."""
     reason = f"Part '{fields['part_no']}' / Op '{fields['op_name']}' not found in master list"
     return [
-        {
-            "Machine": fields["machine"],
-            "Job Order No": fields["order"],
-            "Total Qty": int(fields["qty"]),
-            "Part No": fields["part_no"],
-            "Part Name": fields["product"],
-            "Operation": fields["op_name"],
-            "Shift": shift,
-            "Anomaly": reason,
-        }
+        {**_base_record(fields), "Shift": shift, "Anomaly": reason}
         for shift in SHIFT_NAMES
     ]
 
@@ -98,16 +101,7 @@ def _build_shift_records(
 ) -> list[dict[str, Any]]:
     """Build output records for shifts with positive plan quantities."""
     return [
-        {
-            "Machine": fields["machine"],
-            "Job Order No": fields["order"],
-            "Total Qty": int(fields["qty"]),
-            "Part No": fields["part_no"],
-            "Part Name": fields["product"],
-            "Operation": fields["op_name"],
-            "Plan Qty": plan_qty,
-            "Shift": shift_name,
-        }
+        {**_base_record(fields), "Plan Qty": plan_qty, "Shift": shift_name}
         for shift_name, plan_qty in shift_plans.items()
         if plan_qty > 0
     ]
@@ -118,16 +112,7 @@ def _build_shift_anomalies(
 ) -> list[dict[str, Any]]:
     """Convert shift-level anomaly info into full anomaly records."""
     return [
-        {
-            "Machine": fields["machine"],
-            "Job Order No": fields["order"],
-            "Total Qty": int(fields["qty"]),
-            "Part No": fields["part_no"],
-            "Part Name": fields["product"],
-            "Operation": fields["op_name"],
-            "Shift": a["shift"],
-            "Anomaly": a["reason"],
-        }
+        {**_base_record(fields), "Shift": a["shift"], "Anomaly": a["reason"]}
         for a in shift_anomalies
     ]
 
