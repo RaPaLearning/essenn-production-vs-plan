@@ -72,7 +72,7 @@ def main() -> None:
         st.subheader("Preview Summary")
         preview_df: pd.DataFrame = pd.read_excel(  # type: ignore[reportUnknownMemberType]
             io.BytesIO(st.session_state[state_key]),
-            sheet_name="Shift I",
+            sheet_name="Shift A",
             header=5,
         )
         # Keep only the 7 data columns from the issue scope

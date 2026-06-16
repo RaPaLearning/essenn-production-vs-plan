@@ -1,8 +1,19 @@
 import datetime
 from typing import Any
+
 import pandas as pd
+
 from planquantity import compute_shift_plan_quantities
 from setup_cycle_times import CycleTimeLookup, get_cycle_minutes
+
+SHIFT_NAMES = ["Shift A", "Shift B", "Shift C"]
+
+
+def _safe_str(val: object) -> str:
+    """Convert a cell value to a stripped string, returning '' for NaN."""
+    if pd.isna(val):  # type: ignore[arg-type]
+        return ""
+    return str(val).strip()
 
 
 def _parse_date(row: "pd.Series[Any]", index: int) -> datetime.date | None:
@@ -27,106 +38,172 @@ def _parse_datetime(row: "pd.Series[Any]", index: int) -> datetime.datetime | No
         return None
 
 
+def _is_row_active(row: "pd.Series[Any]", target: datetime.date) -> bool:
+    """Check if a row has a valid order and its date range covers the target."""
+    if pd.isna(row.iloc[0]):  # type: ignore[arg-type]
+        return False
+    start = _parse_date(row, 8)
+    end = _parse_date(row, 10)
+    if start is None or end is None:
+        return False
+    return start <= target <= end
+
+
+def _extract_fields(row: "pd.Series[Any]") -> dict[str, Any]:
+    """Extract and parse all relevant fields from a validated row."""
+    qty_raw: object = row.iloc[3]
+    return {
+        "order": _safe_str(row.iloc[0]),
+        "product": _safe_str(row.iloc[1]),
+        "part_no": _safe_str(row.iloc[2]),
+        "qty": float(qty_raw) if not pd.isna(qty_raw) else 0.0,  # type: ignore[arg-type]
+        "op_name": _safe_str(row.iloc[6]),
+        "machine": _safe_str(row.iloc[7]),
+        "start_dt": _parse_datetime(row, 8),
+        "end_dt": _parse_datetime(row, 10),
+    }
+
+
+def _resolve_cycle_time(
+    cycle_lookup: CycleTimeLookup | None,
+    part_no: str,
+    op_name: str,
+) -> tuple[float, float] | None:
+    """Resolve setup and cycle time. Returns None if part not in master list."""
+    if cycle_lookup is None:
+        return (0.0, 0.0)
+    return get_cycle_minutes(cycle_lookup, part_no, op_name)
+
+
+def _make_lookup_anomalies(fields: dict[str, Any]) -> list[dict[str, Any]]:
+    """Create anomaly records for all shifts when part is not in master list."""
+    reason = f"Part '{fields['part_no']}' / Op '{fields['op_name']}' not found in master list"
+    return [
+        {
+            "Machine": fields["machine"],
+            "Job Order No": fields["order"],
+            "Total Qty": int(fields["qty"]),
+            "Part No": fields["part_no"],
+            "Part Name": fields["product"],
+            "Operation": fields["op_name"],
+            "Shift": shift,
+            "Anomaly": reason,
+        }
+        for shift in SHIFT_NAMES
+    ]
+
+
+def _build_shift_records(
+    fields: dict[str, Any], shift_plans: dict[str, int]
+) -> list[dict[str, Any]]:
+    """Build output records for shifts with positive plan quantities."""
+    return [
+        {
+            "Machine": fields["machine"],
+            "Job Order No": fields["order"],
+            "Total Qty": int(fields["qty"]),
+            "Part No": fields["part_no"],
+            "Part Name": fields["product"],
+            "Operation": fields["op_name"],
+            "Plan Qty": plan_qty,
+            "Shift": shift_name,
+        }
+        for shift_name, plan_qty in shift_plans.items()
+        if plan_qty > 0
+    ]
+
+
+def _build_shift_anomalies(
+    fields: dict[str, Any], shift_anomalies: list[dict[str, str]]
+) -> list[dict[str, Any]]:
+    """Convert shift-level anomaly info into full anomaly records."""
+    return [
+        {
+            "Machine": fields["machine"],
+            "Job Order No": fields["order"],
+            "Total Qty": int(fields["qty"]),
+            "Part No": fields["part_no"],
+            "Part Name": fields["product"],
+            "Operation": fields["op_name"],
+            "Shift": a["shift"],
+            "Anomaly": a["reason"],
+        }
+        for a in shift_anomalies
+    ]
+
+
+def _compute_and_build(
+    fields: dict[str, Any],
+    target: datetime.date,
+    cycle_result: tuple[float, float],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Compute shift plans and build output records and anomalies."""
+    setup_mins, cycle_mins = cycle_result
+    shift_plans, shift_anomalies = compute_shift_plan_quantities(
+        fields["qty"],
+        fields["start_dt"],
+        fields["end_dt"],
+        target,
+        setup_minutes=setup_mins,
+        cycle_minutes_per_item=cycle_mins,
+    )
+    records = _build_shift_records(fields, shift_plans)
+    anomalies = _build_shift_anomalies(fields, shift_anomalies)
+    return records, anomalies
+
+
 def _process_row(
     row: "pd.Series[Any]",
     target: datetime.date,
     cycle_lookup: CycleTimeLookup | None = None,
-) -> list[dict[str, Any]]:  # noqa: C901
-    """Return order details for each shift where the job is active on target date."""
-    order: object = row.iloc[0]
-    if pd.isna(order):  # type: ignore[arg-type]
-        return []
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Process a validated, in-range row. Returns (records, anomalies)."""
+    fields = _extract_fields(row)
 
-    start: datetime.date | None = _parse_date(row, 8)
-    end: datetime.date | None = _parse_date(row, 10)
+    if fields["start_dt"] is None or fields["end_dt"] is None:
+        return [], []
 
-    if start is None or end is None:
-        return []
+    cycle_result = _resolve_cycle_time(cycle_lookup, fields["part_no"], fields["op_name"])
+    if cycle_result is None:
+        return [], _make_lookup_anomalies(fields)
 
-    if start <= target <= end:
-        machine: object = row.iloc[7]
-        machine_str: str = str(machine).strip() if not pd.isna(machine) else ""  # type: ignore[arg-type]
-
-        # Extract template fields
-        product: object = row.iloc[1]
-        part_no: object = row.iloc[2]
-        qty: object = row.iloc[3]
-        op_name: object = row.iloc[6]
-
-        qty_val = float(qty) if not pd.isna(qty) else 0.0  # type: ignore[arg-type]
-        part_no_str = str(part_no).strip() if not pd.isna(part_no) else ""  # type: ignore[arg-type]
-        product_str = str(product).strip() if not pd.isna(product) else ""  # type: ignore[arg-type]
-        op_name_str = str(op_name).strip() if not pd.isna(op_name) else ""  # type: ignore[arg-type]
-
-        start_dt = _parse_datetime(row, 8)
-        end_dt = _parse_datetime(row, 10)
-
-        if start_dt is None or end_dt is None:
-            return []
-
-        # Look up setup and cycle time from masterlist
-        setup_mins = 0.0
-        cycle_mins = 0.0
-        if cycle_lookup is not None:
-            setup_mins, cycle_mins = get_cycle_minutes(cycle_lookup, part_no_str, op_name_str)
-
-        shift_plans = compute_shift_plan_quantities(
-            qty_val,
-            start_dt,
-            end_dt,
-            target,
-            setup_minutes=setup_mins,
-            cycle_minutes_per_item=cycle_mins,
-        )
-
-        records: list[dict[str, Any]] = []
-        for shift_name, plan_qty in shift_plans.items():
-            if plan_qty > 0:
-                records.append(
-                    {
-                        "Machine": machine_str,
-                        "Job Order No": str(order).strip(),
-                        "Total Qty": int(qty_val),
-                        "Part No": part_no_str,
-                        "Part Name": product_str,
-                        "Operation": op_name_str,
-                        "Plan Qty": plan_qty,
-                        "Shift": shift_name,
-                    }
-                )
-
-        return records
-
-    return []
+    return _compute_and_build(fields, target, cycle_result)
 
 
 def _process_sheet(
     df: pd.DataFrame,
     target: datetime.date,
     cycle_lookup: CycleTimeLookup | None = None,
-) -> list[dict[str, Any]]:
-    """Return all active job records from a single sheet."""
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Return all active job records and anomalies from a single sheet."""
     if df.shape[0] < 6:
-        return []
+        return [], []
 
-    results: list[dict[str, Any]] = []
+    all_records: list[dict[str, Any]] = []
+    all_anomalies: list[dict[str, Any]] = []
     for _, row in df.iloc[5:].iterrows():
-        records = _process_row(row, target, cycle_lookup)
-        results.extend(records)
-    return results
+        if not _is_row_active(row, target):
+            continue
+        records, anomalies = _process_row(row, target, cycle_lookup)
+        all_records.extend(records)
+        all_anomalies.extend(anomalies)
+    return all_records, all_anomalies
 
 
 def get_active_jobs(
     input_path: str,
     date_str: str,
     cycle_lookup: CycleTimeLookup | None = None,
-) -> list[dict[str, Any]]:
-    """Load the Excel file and return all active job records for the given date."""
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Load the Excel file and return all active job records and anomalies."""
     target: datetime.date = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
     sheets: dict[str, pd.DataFrame] = pd.read_excel(  # type: ignore[reportUnknownMemberType]
         input_path, sheet_name=None, header=None
     )
     rows: list[dict[str, Any]] = []
+    anomalies: list[dict[str, Any]] = []
     for df in sheets.values():
-        rows.extend(_process_sheet(df, target, cycle_lookup))
-    return rows
+        sheet_rows, sheet_anomalies = _process_sheet(df, target, cycle_lookup)
+        rows.extend(sheet_rows)
+        anomalies.extend(sheet_anomalies)
+    return rows, anomalies

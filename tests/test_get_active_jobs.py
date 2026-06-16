@@ -121,5 +121,6 @@ class TestGetActiveJobs(unittest.TestCase):
         # But force _parse_datetime to return None
         mock_parse_datetime.return_value = None
 
-        result = _process_row(row, target)
-        self.assertEqual(result, [])
+        records, anomalies = _process_row(row, target)
+        self.assertEqual(records, [])
+        self.assertEqual(anomalies, [])

@@ -79,10 +79,11 @@ def get_cycle_minutes(
     lookup: CycleTimeLookup,
     part_no: str,
     operation_name: str,
-) -> tuple[float, float]:
+) -> tuple[float, float] | None:
     """Look up setup and cycle time for a (part_no, operation_name) pair.
 
     Returns (setup_minutes, cycle_minutes_per_item).
-    Returns (0.0, 0.0) if not found.
+    Returns None if not found in the master list.
     """
-    return lookup.get((part_no.strip(), operation_name.strip()), (0.0, 0.0))
+    return lookup.get((part_no.strip(), operation_name.strip()))
+

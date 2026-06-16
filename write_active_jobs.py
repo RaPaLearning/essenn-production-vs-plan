@@ -1,8 +1,10 @@
 import datetime
 from typing import Any, cast
+
 import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+
 from get_active_jobs import get_active_jobs
 from setup_cycle_times import CycleTimeLookup, load_cycle_times
 
@@ -47,7 +49,7 @@ def _write_header(
     ws["A2"] = "SHIFT:"  # type: ignore[reportUnknownMemberType]
     ws["A2"].font = bold_font  # type: ignore[reportUnknownMemberType]
     ws.merge_cells("C2:M2")  # type: ignore[reportUnknownMemberType]
-    ws["C2"] = f"{label} Shift"  # type: ignore[reportUnknownMemberType]
+    ws["C2"] = f"Shift {label}"  # type: ignore[reportUnknownMemberType]
     ws["C2"].font = meta_font  # type: ignore[reportUnknownMemberType]
     ws["C2"].alignment = Alignment(horizontal="left", vertical="center")  # type: ignore[reportUnknownMemberType]
 
@@ -249,6 +251,98 @@ def _write_data_rows(
     return start_row
 
 
+def _write_anomaly_data_row(
+    ws: openpyxl.worksheet.worksheet.Worksheet,  # type: ignore[reportUnknownMemberType]
+    r_num: int,
+    idx: int,
+    anomaly: dict[str, Any],
+    data_font: Font,
+    thin: Side,
+    thick: Side,
+    fill: PatternFill,
+    is_last: bool,
+) -> None:
+    """Write one anomaly row with reason spanning the last columns."""
+    ws.row_dimensions[r_num].height = 24  # type: ignore[reportUnknownMemberType]
+    ws.cell(row=r_num, column=1, value=idx + 1)  # type: ignore[reportUnknownMemberType]
+    data_keys = ["Machine", "Job Order No", "Total Qty", "Part No", "Part Name", "Operation"]
+    for col_i, key in enumerate(data_keys, start=2):
+        ws.cell(row=r_num, column=col_i, value=anomaly[key])  # type: ignore[reportUnknownMemberType]
+    ws.merge_cells(  # type: ignore[reportUnknownMemberType]
+        start_row=r_num, start_column=8, end_row=r_num, end_column=13
+    )
+    ws.cell(row=r_num, column=8, value=anomaly["Anomaly"])  # type: ignore[reportUnknownMemberType]
+    for c in range(1, 14):
+        cell = ws.cell(row=r_num, column=c)  # type: ignore[reportUnknownMemberType]
+        cell.font = data_font  # type: ignore[reportUnknownMemberType]
+        cell.fill = fill  # type: ignore[reportUnknownMemberType]
+        cell.border = _make_border(thin, thick, c, False, is_last)  # type: ignore[reportUnknownMemberType]
+        cell.alignment = Alignment(horizontal="left", vertical="center")  # type: ignore[reportUnknownMemberType]
+
+
+def _write_anomaly_section(
+    ws: openpyxl.worksheet.worksheet.Worksheet,  # type: ignore[reportUnknownMemberType]
+    anomalies: list[dict[str, Any]],
+    start_row: int,
+    thin: Side,
+    thick: Side,
+) -> int:
+    """Write the anomalies section after normal data rows. Returns last row."""
+    header_font = Font(name="Arial", size=10, bold=True)
+    data_font = Font(name="Arial", size=10)
+    fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+    fill_red = PatternFill(start_color="FFE0E0", end_color="FFE0E0", fill_type="solid")
+    fill_grey = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+
+    # Section title row
+    title_row = start_row
+    ws.merge_cells(  # type: ignore[reportUnknownMemberType]
+        start_row=title_row, start_column=1, end_row=title_row, end_column=13
+    )
+    cell = ws.cell(row=title_row, column=1, value="ANOMALIES")  # type: ignore[reportUnknownMemberType]
+    cell.font = header_font  # type: ignore[reportUnknownMemberType]
+    cell.fill = fill_yellow  # type: ignore[reportUnknownMemberType]
+    cell.alignment = Alignment(horizontal="center", vertical="center")  # type: ignore[reportUnknownMemberType]
+
+    # Column headers
+    col_row = title_row + 1
+    col_headers = [
+        "S.No.", "MACHINE", "JOB ORDER No", "TOTAL QTY",
+        "PART NO", "PART NAME", "OPERATION", "ANOMALY REASON",
+    ]
+    for i, h in enumerate(col_headers[:7], 1):
+        c = ws.cell(row=col_row, column=i, value=h)  # type: ignore[reportUnknownMemberType]
+        c.font = header_font  # type: ignore[reportUnknownMemberType]
+        c.fill = fill_grey  # type: ignore[reportUnknownMemberType]
+        c.border = _make_border(thin, thick, i, True, True)  # type: ignore[reportUnknownMemberType]
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)  # type: ignore[reportUnknownMemberType]
+    ws.merge_cells(  # type: ignore[reportUnknownMemberType]
+        start_row=col_row, start_column=8, end_row=col_row, end_column=13
+    )
+    reason_cell = ws.cell(row=col_row, column=8, value="ANOMALY REASON")  # type: ignore[reportUnknownMemberType]
+    reason_cell.font = header_font  # type: ignore[reportUnknownMemberType]
+    reason_cell.fill = fill_grey  # type: ignore[reportUnknownMemberType]
+    reason_cell.border = _make_border(thin, thick, 8, True, True)  # type: ignore[reportUnknownMemberType]
+    reason_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)  # type: ignore[reportUnknownMemberType]
+    ws.row_dimensions[col_row].height = 25  # type: ignore[reportUnknownMemberType]
+
+    # Anomaly data rows
+    for idx, anomaly in enumerate(anomalies):
+        _write_anomaly_data_row(
+            ws,  # type: ignore[reportUnknownArgumentType]
+            col_row + 1 + idx,
+            idx,
+            anomaly,
+            data_font,
+            thin,
+            thick,
+            fill_red,
+            is_last=(idx == len(anomalies) - 1),
+        )
+
+    return col_row + len(anomalies)
+
+
 def _write_footer(
     ws: openpyxl.worksheet.worksheet.Worksheet,  # type: ignore[reportUnknownMemberType]
     last_grid_row: int,
@@ -291,6 +385,7 @@ def _fill_shift_sheet(
     label: str,
     target_date: datetime.date,
     rows: list[dict[str, Any]],
+    anomalies: list[dict[str, Any]],
 ) -> None:
     """Style and fill the given sheet with the shift template layout."""
     ws.views.sheetView[0].showGridLines = True  # type: ignore[reportUnknownMemberType]
@@ -315,6 +410,10 @@ def _fill_shift_sheet(
     _write_header(ws, label, target_date, thin, thick, meta_font)  # type: ignore[reportUnknownArgumentType]
     _write_table_headers(ws, header_font, fill_grey, thin, thick)  # type: ignore[reportUnknownArgumentType]
     last_row = _write_data_rows(ws, rows, data_font, thin, thick)  # type: ignore[reportUnknownArgumentType]
+
+    if anomalies:
+        last_row = _write_anomaly_section(ws, anomalies, last_row + 2, thin, thick)  # type: ignore[reportUnknownArgumentType]
+
     _write_footer(ws, last_row)  # type: ignore[reportUnknownArgumentType]
 
 
@@ -331,27 +430,29 @@ def export_active_jobs(
     if masterlist_path is not None:
         cycle_lookup = load_cycle_times(masterlist_path)
 
-    rows = get_active_jobs(input_path, date_str, cycle_lookup)
+    rows, anomalies = get_active_jobs(input_path, date_str, cycle_lookup)
 
     # Save workbook with exactly the three shift sheets
     wb = openpyxl.Workbook()
 
-    # Configure Shift I on the default first sheet
-    # openpyxl.Workbook() always creates an active sheet; cast narrows the type for pyright
-    ws_shift1: openpyxl.worksheet.worksheet.Worksheet = (  # type: ignore[reportUnknownMemberType]
+    # Configure Shift A on the default first sheet
+    ws_shift_a: openpyxl.worksheet.worksheet.Worksheet = (  # type: ignore[reportUnknownMemberType]
         cast(openpyxl.worksheet.worksheet.Worksheet, wb.active)  # type: ignore[reportUnknownMemberType]
     )
-    ws_shift1.title = "Shift I"  # type: ignore[reportUnknownMemberType]
-    rows_s1 = [r for r in rows if r.get("Shift") == "Shift I"]
-    _fill_shift_sheet(ws_shift1, "1st", target_date, rows_s1)  # type: ignore[reportUnknownArgumentType]
+    ws_shift_a.title = "Shift A"  # type: ignore[reportUnknownMemberType]
+    rows_a = [r for r in rows if r.get("Shift") == "Shift A"]
+    anom_a = [a for a in anomalies if a.get("Shift") == "Shift A"]
+    _fill_shift_sheet(ws_shift_a, "A", target_date, rows_a, anom_a)  # type: ignore[reportUnknownArgumentType]
 
-    # Create Shift II and III sheets
-    ws_shift2 = wb.create_sheet(title="Shift II")  # type: ignore[reportUnknownMemberType]
-    rows_s2 = [r for r in rows if r.get("Shift") == "Shift II"]
-    _fill_shift_sheet(ws_shift2, "2nd", target_date, rows_s2)
+    # Create Shift B and C sheets
+    ws_shift_b = wb.create_sheet(title="Shift B")  # type: ignore[reportUnknownMemberType]
+    rows_b = [r for r in rows if r.get("Shift") == "Shift B"]
+    anom_b = [a for a in anomalies if a.get("Shift") == "Shift B"]
+    _fill_shift_sheet(ws_shift_b, "B", target_date, rows_b, anom_b)
 
-    ws_shift3 = wb.create_sheet(title="Shift III")  # type: ignore[reportUnknownMemberType]
-    rows_s3 = [r for r in rows if r.get("Shift") == "Shift III"]
-    _fill_shift_sheet(ws_shift3, "3rd", target_date, rows_s3)
+    ws_shift_c = wb.create_sheet(title="Shift C")  # type: ignore[reportUnknownMemberType]
+    rows_c = [r for r in rows if r.get("Shift") == "Shift C"]
+    anom_c = [a for a in anomalies if a.get("Shift") == "Shift C"]
+    _fill_shift_sheet(ws_shift_c, "C", target_date, rows_c, anom_c)
 
     wb.save(output_path)  # type: ignore[reportUnknownMemberType]

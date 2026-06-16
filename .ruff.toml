@@ -4,4 +4,4 @@ line-length = 100
 select = ["E", "W", "F", "C901"]
 
 [lint.mccabe]
-max-complexity = 15
+max-complexity = 4

@@ -90,9 +90,11 @@ class TestLoadCycleTimes(unittest.TestCase):
 
         # Spot-check a known entry from the file
         # 2D555550R, Turning 1st -> setup=20min, cycle=1min
-        setup, cycle = get_cycle_minutes(lookup, "2D555550R", "Turning 1st")
-        self.assertAlmostEqual(setup, 20.0)
-        self.assertAlmostEqual(cycle, 1.0)
+        result = get_cycle_minutes(lookup, "2D555550R", "Turning 1st")
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertAlmostEqual(result[0], 20.0)
+        self.assertAlmostEqual(result[1], 1.0)
 
     @patch("os.path.exists")
     def test_load_real_masterlist_skipped(self, mock_exists: MagicMock) -> None:
@@ -109,9 +111,9 @@ class TestGetCycleMinutes(unittest.TestCase):
         lookup: CycleTimeLookup = {("P1", "Op1"): (10.0, 2.0)}
         self.assertEqual(get_cycle_minutes(lookup, "P1", "Op1"), (10.0, 2.0))
 
-    def test_not_found_returns_zeros(self) -> None:
+    def test_not_found_returns_none(self) -> None:
         lookup: CycleTimeLookup = {}
-        self.assertEqual(get_cycle_minutes(lookup, "P1", "Op1"), (0.0, 0.0))
+        self.assertIsNone(get_cycle_minutes(lookup, "P1", "Op1"))
 
     def test_whitespace_stripping(self) -> None:
         lookup: CycleTimeLookup = {("P1", "Op1"): (5.0, 1.5)}
