@@ -116,7 +116,7 @@ class TestComputeShiftPlanQuantities(unittest.TestCase):
         # On target date 2026-03-10:
         # Shift B: 2 hours -> 20 items.
         # Shift C: 8 hours -> 80 items.
-        result, anomalies = compute_shift_plan_quantities(
+        result, _ = compute_shift_plan_quantities(
             qty=240.0,
             start_dt=start,
             end_dt=end,
