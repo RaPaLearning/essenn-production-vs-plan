@@ -92,7 +92,7 @@ class TestLoadCycleTimes(unittest.TestCase):
         # 2D555550R, Turning 1st -> setup=20min, cycle=1min
         result = get_cycle_minutes(lookup, "2D555550R", "Turning 1st")
         self.assertIsNotNone(result)
-        assert result is not None
+        assert result is not None  # nosec B101
         self.assertAlmostEqual(result[0], 20.0)
         self.assertAlmostEqual(result[1], 1.0)
 
