@@ -5,10 +5,7 @@
 
 version: 2
 updates:
-  - package-ecosystem: "npm"
-    directory: "/" # package-lock.json is in the base of the repo
-    schedule:
-      interval: "weekly"
+
 
   - package-ecosystem: "uv"
     directory: "/" # uv.lock is in the base of the repo
