@@ -11,6 +11,10 @@ import pandas as pd
 
 from write_active_jobs import export_active_jobs
 
+MASTERLIST_PATH: str = str(
+    Path(__file__).parent / "data" / "sample" / "Opcenter masterlist of components.xls"
+)
+
 
 def main() -> None:
     st.set_page_config(
@@ -44,7 +48,12 @@ def main() -> None:
                         input_path.write_bytes(uploaded_file.getvalue())
 
                         date_str = selected_date.strftime("%Y-%m-%d")
-                        export_active_jobs(str(input_path), date_str, str(output_path))
+                        export_active_jobs(
+                            str(input_path),
+                            date_str,
+                            str(output_path),
+                            masterlist_path=MASTERLIST_PATH,
+                        )
 
                         st.session_state[state_key] = output_path.read_bytes()
                 except Exception as e:
@@ -63,7 +72,7 @@ def main() -> None:
         st.subheader("Preview Summary")
         preview_df: pd.DataFrame = pd.read_excel(  # type: ignore[reportUnknownMemberType]
             io.BytesIO(st.session_state[state_key]),
-            sheet_name="Shift I",
+            sheet_name="Shift A",
             header=5,
         )
         # Keep only the 7 data columns from the issue scope

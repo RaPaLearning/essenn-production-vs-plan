@@ -8,7 +8,9 @@ import pandas as pd
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from get_active_jobs import _parse_datetime  # type: ignore[reportPrivateUsage]
+from unittest.mock import MagicMock, patch
+
+from get_active_jobs import _parse_datetime, _process_row  # type: ignore[reportPrivateUsage]
 from write_active_jobs import export_active_jobs
 
 FIXTURE = "tests/fixtures/test_operations.xlsx"
@@ -104,3 +106,21 @@ class TestGetActiveJobs(unittest.TestCase):
         row = pd.Series(["not-a-date"] * 12)
         result = _parse_datetime(row, 0)
         self.assertIsNone(result)
+
+    @patch("get_active_jobs._parse_datetime")
+    def test_process_row_parse_datetime_fails(self, mock_parse_datetime: MagicMock) -> None:
+        """Cover the start_dt is None or end_dt is None check in _process_row."""
+        # Setup row with valid dates so _parse_date passes
+        import datetime
+        row = pd.Series([None] * 12)
+        row.iloc[0] = "J001"
+        row.iloc[8] = "10/03/2026"
+        row.iloc[10] = "15/03/2026"
+        target = datetime.date(2026, 3, 12)
+
+        # But force _parse_datetime to return None
+        mock_parse_datetime.return_value = None
+
+        records, anomalies = _process_row(row, target)
+        self.assertEqual(records, [])
+        self.assertEqual(anomalies, [])

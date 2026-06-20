@@ -1,6 +1,7 @@
 .venv
 node_modules
 .ruff_cache
+.pytest_cache
 __pycache__
 *.pyc
 htmlcov

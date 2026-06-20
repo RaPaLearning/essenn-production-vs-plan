@@ -8,6 +8,7 @@ dependencies = [
     "pandas>=3.0.3",
     "openpyxl>=3.1.0",
     "streamlit>=1.57.0",
+    "xlrd>=2.0.2",
 ]
 
 [dependency-groups]
@@ -19,9 +20,9 @@ dev = [
     "pyright>=1.1.409",
     "ruff>=0.15.14",
     "pandas-stubs>=2.0.0",
-    "pytest>=7.0.0",
     "vulture>=2.14.0",
 ]
 
 [tool.pyright]
 typeCheckingMode = "strict"
+extraPaths = ["."]
