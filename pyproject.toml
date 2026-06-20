@@ -19,7 +19,7 @@ dev = [
     "pip-audit>=2.10.0",
     "pyright>=1.1.409",
     "ruff>=0.15.14",
-    "pandas-stubs>=2.0.0",
+    "pandas-stubs>=3.0.3.260530",
     "vulture>=2.14.0",
 ]
 
