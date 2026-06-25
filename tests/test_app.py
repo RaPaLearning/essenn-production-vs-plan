@@ -4,13 +4,11 @@ import unittest
 from datetime import date
 from streamlit.testing.v1 import AppTest
 
+# Suppress all Streamlit stderr noise (logging + raw pyarrow tracebacks).
+logging.getLogger("streamlit").setLevel(logging.ERROR)
+
 
 class TestApp(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        """Suppress all Streamlit stderr noise at every level."""
-        logging.getLogger("streamlit").setLevel(logging.ERROR)
-
     def setUp(self) -> None:
         """Redirect the OS-level stderr fd to devnull to silence pyarrow tracebacks."""
         self._orig_stderr_fd = os.dup(2)
