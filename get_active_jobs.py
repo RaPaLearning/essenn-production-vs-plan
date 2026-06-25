@@ -3,10 +3,14 @@ from typing import Any
 
 import pandas as pd
 
-from planquantity import compute_shift_plan_quantities
-from setup_cycle_times import CycleTimeLookup, get_cycle_minutes
-
-SHIFT_NAMES = ["Shift A", "Shift B", "Shift C"]
+from planquantity import SHIFTS_BY_TYPE, compute_shift_plan_quantities
+from setup_cycle_times import (
+    CycleTimeLookup,
+    MachineType,
+    MachineTypeLookup,
+    get_cycle_minutes,
+    get_machine_type,
+)
 
 
 def _safe_str(val: object) -> str:
@@ -87,12 +91,19 @@ def _base_record(fields: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _make_lookup_anomalies(fields: dict[str, Any]) -> list[dict[str, Any]]:
+def _shift_names_for_type(machine_type: MachineType) -> list[str]:
+    """Return shift names for the given machine type."""
+    return [name for name, _, _ in SHIFTS_BY_TYPE[machine_type]]
+
+
+def _make_lookup_anomalies(
+    fields: dict[str, Any], machine_type: MachineType,
+) -> list[dict[str, Any]]:
     """Create anomaly records for all shifts when part is not in master list."""
     reason = f"Part '{fields['part_no']}' / Op '{fields['op_name']}' not found in master list"
     return [
         {**_base_record(fields), "Shift": shift, "Anomaly": reason}
-        for shift in SHIFT_NAMES
+        for shift in _shift_names_for_type(machine_type)
     ]
 
 
@@ -121,6 +132,7 @@ def _compute_and_build(
     fields: dict[str, Any],
     target: datetime.date,
     cycle_result: tuple[float, float],
+    machine_type: MachineType,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Compute shift plans and build output records and anomalies."""
     setup_mins, cycle_mins = cycle_result
@@ -131,6 +143,7 @@ def _compute_and_build(
         target,
         setup_minutes=setup_mins,
         cycle_minutes_per_item=cycle_mins,
+        machine_type=machine_type,
     )
     records = _build_shift_records(fields, shift_plans)
     anomalies = _build_shift_anomalies(fields, shift_anomalies)
@@ -141,6 +154,7 @@ def _process_row(
     row: "pd.Series[Any]",
     target: datetime.date,
     cycle_lookup: CycleTimeLookup | None = None,
+    machine_type: MachineType = "turning",
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Process a validated, in-range row. Returns (records, anomalies)."""
     fields = _extract_fields(row)
@@ -150,15 +164,16 @@ def _process_row(
 
     cycle_result = _resolve_cycle_time(cycle_lookup, fields["part_no"], fields["op_name"])
     if cycle_result is None:
-        return [], _make_lookup_anomalies(fields)
+        return [], _make_lookup_anomalies(fields, machine_type)
 
-    return _compute_and_build(fields, target, cycle_result)
+    return _compute_and_build(fields, target, cycle_result, machine_type)
 
 
 def _process_sheet(
     df: pd.DataFrame,
     target: datetime.date,
     cycle_lookup: CycleTimeLookup | None = None,
+    machine_type_lookup: MachineTypeLookup | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Return all active job records and anomalies from a single sheet."""
     if df.shape[0] < 6:
@@ -169,7 +184,13 @@ def _process_sheet(
     for _, row in df.iloc[5:].iterrows():
         if not _is_row_active(row, target):
             continue
-        records, anomalies = _process_row(row, target, cycle_lookup)
+        machine = _safe_str(row.iloc[7])
+        m_type: MachineType = (
+            get_machine_type(machine_type_lookup, machine)
+            if machine_type_lookup is not None
+            else "turning"
+        )
+        records, anomalies = _process_row(row, target, cycle_lookup, m_type)
         all_records.extend(records)
         all_anomalies.extend(anomalies)
     return all_records, all_anomalies
@@ -179,6 +200,7 @@ def get_active_jobs(
     input_path: str,
     date_str: str,
     cycle_lookup: CycleTimeLookup | None = None,
+    machine_type_lookup: MachineTypeLookup | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Load the Excel file and return all active job records and anomalies."""
     target: datetime.date = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -188,7 +210,9 @@ def get_active_jobs(
     rows: list[dict[str, Any]] = []
     anomalies: list[dict[str, Any]] = []
     for df in sheets.values():
-        sheet_rows, sheet_anomalies = _process_sheet(df, target, cycle_lookup)
+        sheet_rows, sheet_anomalies = _process_sheet(
+            df, target, cycle_lookup, machine_type_lookup,
+        )
         rows.extend(sheet_rows)
         anomalies.extend(sheet_anomalies)
     return rows, anomalies

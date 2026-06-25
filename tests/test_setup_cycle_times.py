@@ -10,9 +10,13 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from setup_cycle_times import (
     CycleTimeLookup,
+    MachineTypeLookup,
+    _normalize_machine_name,  # type: ignore[reportPrivateUsage]
     _parse_time_string,  # type: ignore[reportPrivateUsage]
     get_cycle_minutes,
+    get_machine_type,
     load_cycle_times,
+    load_machine_types,
 )
 
 
@@ -104,8 +108,6 @@ class TestLoadCycleTimes(unittest.TestCase):
             self.test_load_real_masterlist()
 
 
-
-
 class TestGetCycleMinutes(unittest.TestCase):
     def test_found(self) -> None:
         lookup: CycleTimeLookup = {("P1", "Op1"): (10.0, 2.0)}
@@ -118,3 +120,102 @@ class TestGetCycleMinutes(unittest.TestCase):
     def test_whitespace_stripping(self) -> None:
         lookup: CycleTimeLookup = {("P1", "Op1"): (5.0, 1.5)}
         self.assertEqual(get_cycle_minutes(lookup, " P1 ", " Op1 "), (5.0, 1.5))
+
+
+class TestNormalizeMachineName(unittest.TestCase):
+    def test_lowercase(self) -> None:
+        self.assertEqual(_normalize_machine_name("ACE COLT"), "ace colt")
+
+    def test_hyphen_to_space(self) -> None:
+        self.assertEqual(_normalize_machine_name("CITIZEN-1"), "citizen 1")
+
+    def test_collapse_whitespace(self) -> None:
+        self.assertEqual(_normalize_machine_name("LMW  ST  2"), "lmw st 2")
+
+    def test_combined_normalization(self) -> None:
+        self.assertEqual(_normalize_machine_name("  DX100 - 2  "), "dx100 2")
+
+
+class TestGetMachineType(unittest.TestCase):
+    def test_exact_match_turning(self) -> None:
+        lookup: MachineTypeLookup = {"doosan 1": "turning"}
+        self.assertEqual(get_machine_type(lookup, "Doosan 1"), "turning")
+
+    def test_exact_match_milling(self) -> None:
+        lookup: MachineTypeLookup = {"doosan vmc 1": "milling"}
+        self.assertEqual(get_machine_type(lookup, "Doosan VMC 1"), "milling")
+
+    def test_fuzzy_match_citizen(self) -> None:
+        """'Citizen 1' should match 'CITIZEN-1' via normalization."""
+        lookup: MachineTypeLookup = {"citizen 1": "milling"}
+        self.assertEqual(get_machine_type(lookup, "Citizen 1"), "milling")
+
+    def test_prefix_match_jyoti_vmc(self) -> None:
+        """'Jyoti VMC 1' should match 'Jyoti VMC 1 - PX20' via prefix."""
+        lookup: MachineTypeLookup = {"jyoti vmc 1 px20": "milling"}
+        self.assertEqual(get_machine_type(lookup, "Jyoti VMC 1"), "milling")
+
+    def test_unknown_defaults_to_turning(self) -> None:
+        lookup: MachineTypeLookup = {"doosan 1": "turning"}
+        self.assertEqual(get_machine_type(lookup, "Unknown Machine XYZ"), "turning")
+
+    def test_empty_lookup_defaults_to_turning(self) -> None:
+        lookup: MachineTypeLookup = {}
+        self.assertEqual(get_machine_type(lookup, "Any Machine"), "turning")
+
+
+class TestLoadMachineTypes(unittest.TestCase):
+    def test_load_real_machine_list(self) -> None:
+        """Test loading the actual machine list from the new masterlist."""
+        real_path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "data",
+            "sample",
+            "Mater list of Component(Preactor)-1 (1) (1).xls",
+        )
+        if not os.path.exists(real_path):
+            self.skipTest("New masterlist not available")
+
+        lookup = load_machine_types(real_path)
+        self.assertGreater(len(lookup), 0)
+
+        # Spot-check known machines
+        self.assertEqual(get_machine_type(lookup, "Doosan VMC 1"), "milling")
+        self.assertEqual(get_machine_type(lookup, "Citizen 1"), "milling")
+        self.assertEqual(get_machine_type(lookup, "Doosan 1"), "turning")
+        self.assertEqual(get_machine_type(lookup, "Jyoti 2"), "turning")
+
+    @patch("os.path.exists")
+    def test_load_real_machine_list_skipped(self, mock_exists: MagicMock) -> None:
+        """Cover the skipTest branch inside test_load_real_machine_list."""
+        mock_exists.return_value = False
+        with self.assertRaises(unittest.SkipTest):
+            self.test_load_real_machine_list()
+
+    def test_load_machine_types_with_nan_rows(self) -> None:
+        """Cover the NaN-skip branch in load_machine_types."""
+        # Build a minimal "Machine list" sheet matching the real layout:
+        # Rows 0-5 are header/blank, data starts at row 6.
+        blank: list[object] = [None, None, None, None, None]
+        header: list[object] = [None, "SL No", "Machine", "Main Group", "Sub group"]
+        data_rows: list[list[object]] = [
+            blank, blank, blank, blank,
+            header,
+            blank,  # row 5: blank separator
+            [None, 1, "TestTurning", "Turning", "2axis"],
+            [None, None, None, None, None],  # NaN row to cover the continue
+            [None, 2, "TestMilling", "Milling", "4 axis"],
+        ]
+        df = pd.DataFrame(data_rows)
+        tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
+        tmp.close()
+        with pd.ExcelWriter(tmp.name) as writer:  # type: ignore[reportUnknownVariableType]
+            df.to_excel(writer, sheet_name="Machine list", index=False, header=False)  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+        try:
+            lookup = load_machine_types(tmp.name)
+            self.assertEqual(len(lookup), 2)
+            self.assertEqual(get_machine_type(lookup, "TestTurning"), "turning")
+            self.assertEqual(get_machine_type(lookup, "TestMilling"), "milling")
+        finally:
+            os.remove(tmp.name)

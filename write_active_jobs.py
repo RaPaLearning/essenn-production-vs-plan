@@ -6,7 +6,13 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from get_active_jobs import get_active_jobs
-from setup_cycle_times import CycleTimeLookup, load_cycle_times
+from setup_cycle_times import CycleTimeLookup, MachineTypeLookup, load_cycle_times, load_machine_types
+
+_SHIFT_TIMINGS: dict[str, tuple[str, str]] = {
+    "A": ("Turning: 6:00 AM \u2013 2:00 PM  |  Milling/Citizen: 6:00 AM \u2013 2:30 PM", ""),
+    "B": ("Turning: 2:00 PM \u2013 10:00 PM  |  Milling/Citizen: 2:30 PM \u2013 11:00 PM", ""),
+    "C": ("Turning: 10:00 PM \u2013 6:00 AM", ""),
+}
 
 
 def _make_border(
@@ -62,6 +68,15 @@ def _write_header(
                 r == 1,
                 r == 2,
             )
+
+    # Shift timing note in rows 3-4
+    timing_text = _SHIFT_TIMINGS.get(label, ("", ""))[0]
+    if timing_text:
+        note_font = Font(name="Arial", size=8, italic=True, color="555555")
+        ws.merge_cells("A3:M3")  # type: ignore[reportUnknownMemberType]
+        ws["A3"] = timing_text  # type: ignore[reportUnknownMemberType]
+        ws["A3"].font = note_font  # type: ignore[reportUnknownMemberType]
+        ws["A3"].alignment = Alignment(horizontal="left", vertical="center")  # type: ignore[reportUnknownMemberType]
 
 
 def _style_row(
@@ -427,10 +442,17 @@ def export_active_jobs(
     target_date: datetime.date = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
 
     cycle_lookup: CycleTimeLookup | None = None
+    machine_type_lookup: MachineTypeLookup | None = None
     if masterlist_path is not None:
         cycle_lookup = load_cycle_times(masterlist_path)
+        try:
+            machine_type_lookup = load_machine_types(masterlist_path)
+        except Exception:  # nosec B110
+            pass  # Machine list sheet may not exist in older masterlists
 
-    rows, anomalies = get_active_jobs(input_path, date_str, cycle_lookup)
+    rows, anomalies = get_active_jobs(
+        input_path, date_str, cycle_lookup, machine_type_lookup,
+    )
 
     # Save workbook with exactly the three shift sheets
     wb = openpyxl.Workbook()
