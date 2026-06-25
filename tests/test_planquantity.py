@@ -204,21 +204,22 @@ class TestComputeShiftPlanQuantities(unittest.TestCase):
 
     def test_early_completion_anomaly(self) -> None:
         """When qty completes early, remaining shifts should show anomaly."""
-        # Job that completes in Shift A but runs across A and B
-        start = datetime.datetime(2026, 3, 10, 8, 0)
-        end = datetime.datetime(2026, 3, 10, 20, 0)
+        # Job runs 7AM-6PM (covers Shift A and part of Shift B)
+        # but qty=30 finishes well within Shift A
+        start = datetime.datetime(2026, 3, 10, 7, 0)
+        end = datetime.datetime(2026, 3, 10, 18, 0)
         target = datetime.date(2026, 3, 10)
 
         result, anomalies = compute_shift_plan_quantities(
-            qty=50.0,
+            qty=30.0,
             start_dt=start,
             end_dt=end,
             target_date=target,
-            setup_minutes=0.0,
-            cycle_minutes_per_item=1.0,
+            setup_minutes=10.0,
+            cycle_minutes_per_item=2.0,
         )
 
-        self.assertEqual(result["Shift A"], 50)
+        self.assertEqual(result["Shift A"], 30)
         self.assertEqual(result["Shift B"], 0)
         # Should have an anomaly for Shift B
         shift_b_anomalies = [a for a in anomalies if a["shift"] == "Shift B"]
