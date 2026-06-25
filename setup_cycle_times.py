@@ -136,6 +136,18 @@ def load_machine_types(xls_path: str) -> MachineTypeLookup:
     return lookup
 
 
+def _find_prefix_match(lookup: MachineTypeLookup, norm: str) -> str:
+    """Find the best prefix match for a normalized machine name.
+
+    Returns the matching key, or empty string if none found.
+    """
+    best_key = ""
+    for key in lookup:
+        if (norm.startswith(key) or key.startswith(norm)) and len(key) > len(best_key):
+            best_key = key
+    return best_key
+
+
 def get_machine_type(
     lookup: MachineTypeLookup,
     machine: str,
@@ -147,20 +159,12 @@ def get_machine_type(
     """
     norm = _normalize_machine_name(machine)
 
-    # Exact match
     if norm in lookup:
         return lookup[norm]
 
-    # Prefix match: check if any key starts with the normalized input
-    # or the normalized input starts with any key
-    best_key = ""
-    for key in lookup:
-        if norm.startswith(key) or key.startswith(norm):
-            if len(key) > len(best_key):
-                best_key = key
-
-    if best_key:
-        return lookup[best_key]
+    best = _find_prefix_match(lookup, norm)
+    if best:
+        return lookup[best]
 
     return "turning"
 
