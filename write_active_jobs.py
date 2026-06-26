@@ -49,7 +49,7 @@ def _write_header(
     ws.merge_cells("C1:M1")  # type: ignore[reportUnknownMemberType]
     ws["C1"] = formatted_date  # type: ignore[reportUnknownMemberType]
     ws["C1"].font = meta_font  # type: ignore[reportUnknownMemberType]
-    ws["C1"].alignment = Alignment(horizontal="left", vertical="center")  # type: ignore[reportUnknownMemberType]
+    ws["C1"].alignment = Alignment(horizontal="left", vertical="center", shrink_to_fit=True)  # type: ignore[reportUnknownMemberType]
 
     ws.merge_cells("A2:B2")  # type: ignore[reportUnknownMemberType]
     ws["A2"] = "SHIFT:"  # type: ignore[reportUnknownMemberType]
@@ -57,7 +57,7 @@ def _write_header(
     ws.merge_cells("C2:M2")  # type: ignore[reportUnknownMemberType]
     ws["C2"] = f"Shift {label}"  # type: ignore[reportUnknownMemberType]
     ws["C2"].font = meta_font  # type: ignore[reportUnknownMemberType]
-    ws["C2"].alignment = Alignment(horizontal="left", vertical="center")  # type: ignore[reportUnknownMemberType]
+    ws["C2"].alignment = Alignment(horizontal="left", vertical="center", shrink_to_fit=True)  # type: ignore[reportUnknownMemberType]
 
     for r in [1, 2]:
         for c in range(1, 14):
@@ -76,7 +76,7 @@ def _write_header(
         ws.merge_cells("A3:M3")  # type: ignore[reportUnknownMemberType]
         ws["A3"] = timing_text  # type: ignore[reportUnknownMemberType]
         ws["A3"].font = note_font  # type: ignore[reportUnknownMemberType]
-        ws["A3"].alignment = Alignment(horizontal="left", vertical="center")  # type: ignore[reportUnknownMemberType]
+        ws["A3"].alignment = Alignment(horizontal="left", vertical="center", shrink_to_fit=True)  # type: ignore[reportUnknownMemberType]
 
 
 def _style_row(
@@ -155,6 +155,7 @@ def _write_table_headers(
         horizontal="center",
         vertical="center",
         wrap_text=True,
+        shrink_to_fit=True,
     )
     for r in [6, 7]:
         ws.row_dimensions[r].height = 25  # type: ignore[reportUnknownMemberType]
@@ -203,7 +204,7 @@ def _write_single_data_row(
         cell.font = data_font  # type: ignore[reportUnknownMemberType]
         cell.border = _make_border(thin, thick, c, False, is_last)  # type: ignore[reportUnknownMemberType]
         h = "center" if c in center_cols else "left"
-        cell.alignment = Alignment(horizontal=h, vertical="center")  # type: ignore[reportUnknownMemberType]
+        cell.alignment = Alignment(horizontal=h, vertical="center", shrink_to_fit=True)  # type: ignore[reportUnknownMemberType]
 
 
 def _write_empty_row(
@@ -292,7 +293,7 @@ def _write_anomaly_data_row(
         cell.font = data_font  # type: ignore[reportUnknownMemberType]
         cell.fill = fill  # type: ignore[reportUnknownMemberType]
         cell.border = _make_border(thin, thick, c, False, is_last)  # type: ignore[reportUnknownMemberType]
-        cell.alignment = Alignment(horizontal="left", vertical="center")  # type: ignore[reportUnknownMemberType]
+        cell.alignment = Alignment(horizontal="left", vertical="center", shrink_to_fit=True)  # type: ignore[reportUnknownMemberType]
 
 
 def _write_anomaly_section(
@@ -382,7 +383,7 @@ def _write_footer(
         3: 16,
         4: 12,
         5: 14,
-        6: 28,
+        6: 45,
         7: 18,
         8: 12,
         9: 10,
@@ -409,7 +410,7 @@ def _fill_shift_sheet(
     ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE  # type: ignore[reportUnknownMemberType]
     ws.sheet_properties.pageSetUpPr.fitToPage = True  # type: ignore[reportUnknownMemberType]
     ws.page_setup.fitToWidth = 1  # type: ignore[reportUnknownMemberType]
-    ws.page_setup.fitToHeight = 0  # type: ignore[reportUnknownMemberType]
+    ws.page_setup.fitToHeight = 1  # type: ignore[reportUnknownMemberType]
 
     header_font = Font(name="Arial", size=10, bold=True)
     meta_font = Font(name="Arial", size=9)
