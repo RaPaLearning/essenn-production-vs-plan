@@ -12,7 +12,7 @@ import pandas as pd
 from write_active_jobs import export_active_jobs
 
 MASTERLIST_PATH: str = str(
-    Path(__file__).parent / "data" / "sample" / "Mater list of Component(Preactor)-1 (1) (1).xls"
+    Path(__file__).parent / "data" / "factory_data" / "Mater list of Component(Preactor)-1 (1) (1).xls"
 )
 
 

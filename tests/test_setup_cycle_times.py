@@ -83,7 +83,7 @@ class TestLoadCycleTimes(unittest.TestCase):
             os.path.dirname(__file__),
             "..",
             "data",
-            "sample",
+            "factory_data",
             "Opcenter masterlist of components.xls",
         )
         if not os.path.exists(real_path):
@@ -171,7 +171,7 @@ class TestLoadMachineTypes(unittest.TestCase):
             os.path.dirname(__file__),
             "..",
             "data",
-            "sample",
+            "factory_data",
             "Mater list of Component(Preactor)-1 (1) (1).xls",
         )
         if not os.path.exists(real_path):
