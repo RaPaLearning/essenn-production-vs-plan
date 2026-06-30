@@ -1,33 +1,50 @@
-"""Compute planned quantity per 8-hour shift using setup and cycle time."""
+"""Compute planned quantity per shift using setup and cycle time."""
 
 import datetime
 from typing import Iterator
 
-SHIFT_HOURS: float = 8.0
+from setup_cycle_times import MachineType
+
+ShiftDef = tuple[str, datetime.time, datetime.time]
+
+TURNING_SHIFTS: list[ShiftDef] = [
+    ("Shift A", datetime.time(6, 0), datetime.time(14, 0)),
+    ("Shift B", datetime.time(14, 0), datetime.time(22, 0)),
+    ("Shift C", datetime.time(22, 0), datetime.time(6, 0)),
+]
+
+MILLING_SHIFTS: list[ShiftDef] = [
+    ("Shift A", datetime.time(6, 0), datetime.time(14, 30)),
+    ("Shift B", datetime.time(14, 30), datetime.time(23, 0)),
+]
+
+SHIFTS_BY_TYPE: dict[MachineType, list[ShiftDef]] = {
+    "turning": TURNING_SHIFTS,
+    "milling": MILLING_SHIFTS,
+}
 
 
 def get_shifts_in_range(
-    start_dt: datetime.datetime, end_dt: datetime.datetime
+    start_dt: datetime.datetime,
+    end_dt: datetime.datetime,
+    shift_defs: list[ShiftDef],
 ) -> Iterator[tuple[str, datetime.date, datetime.datetime, datetime.datetime]]:
     """Yield all shifts spanning from start_dt to end_dt."""
     current_date = start_dt.date() - datetime.timedelta(days=1)
     end_date = end_dt.date() + datetime.timedelta(days=1)
 
     while current_date <= end_date:
-        s1_start = datetime.datetime.combine(current_date, datetime.time(6, 0))
-        s1_end = datetime.datetime.combine(current_date, datetime.time(14, 0))
+        for shift_name, shift_start_time, shift_end_time in shift_defs:
+            s_start = datetime.datetime.combine(current_date, shift_start_time)
+            if shift_end_time <= shift_start_time:
+                # Shift crosses midnight (e.g. 22:00 -> 06:00)
+                s_end = datetime.datetime.combine(
+                    current_date + datetime.timedelta(days=1), shift_end_time
+                )
+            else:
+                s_end = datetime.datetime.combine(current_date, shift_end_time)
 
-        s2_start = datetime.datetime.combine(current_date, datetime.time(14, 0))
-        s2_end = datetime.datetime.combine(current_date, datetime.time(22, 0))
-
-        s3_start = datetime.datetime.combine(current_date, datetime.time(22, 0))
-        s3_end = datetime.datetime.combine(
-            current_date + datetime.timedelta(days=1), datetime.time(6, 0)
-        )
-
-        yield ("Shift A", current_date, s1_start, s1_end)
-        yield ("Shift B", current_date, s2_start, s2_end)
-        yield ("Shift C", current_date, s3_start, s3_end)
+            yield (shift_name, current_date, s_start, s_end)
 
         current_date += datetime.timedelta(days=1)
 
@@ -102,6 +119,7 @@ def _record_target_shift(
     target_date: datetime.date,
     produced: int,
     anomaly_reason: str | None,
+    qty_was_capped: bool,
     result: dict[str, int],
     anomalies: list[dict[str, str]],
 ) -> None:
@@ -111,6 +129,11 @@ def _record_target_shift(
     result[shift_name] = produced
     if anomaly_reason:
         anomalies.append({"shift": shift_name, "reason": anomaly_reason})
+    elif qty_was_capped and produced == 0:
+        anomalies.append({
+            "shift": shift_name,
+            "reason": "Planned quantity fully allocated before this shift",
+        })
 
 
 def _simulate_production(
@@ -121,14 +144,18 @@ def _simulate_production(
     cycle_minutes_per_item: float,
     setup_minutes: float,
     speed: float,
+    shift_defs: list[ShiftDef],
 ) -> tuple[dict[str, int], list[dict[str, str]]]:
     """Simulate shift-by-shift production and collect anomalies."""
-    result: dict[str, int] = {"Shift A": 0, "Shift B": 0, "Shift C": 0}
+    shift_names = [name for name, _, _ in shift_defs]
+    result: dict[str, int] = {name: 0 for name in shift_names}
     anomalies: list[dict[str, str]] = []
     cumulative_qty = 0
     setup_applied = False
 
-    for shift_name, shift_date, shift_start, shift_end in get_shifts_in_range(start_dt, end_dt):
+    for shift_name, shift_date, shift_start, shift_end in get_shifts_in_range(
+        start_dt, end_dt, shift_defs
+    ):
         overlap_mins = _compute_overlap_minutes(start_dt, end_dt, shift_start, shift_end)
         if overlap_mins <= 0:
             continue
@@ -136,11 +163,13 @@ def _simulate_production(
         produced, setup_applied, anomaly_reason = _compute_shift_production(
             overlap_mins, cycle_minutes_per_item, setup_minutes, speed, setup_applied
         )
+        qty_was_capped = cumulative_qty >= total_qty
         produced = _cap_production(produced, cumulative_qty, total_qty)
         cumulative_qty += produced
 
         _record_target_shift(
-            shift_name, shift_date, target_date, produced, anomaly_reason, result, anomalies
+            shift_name, shift_date, target_date, produced, anomaly_reason,
+            qty_was_capped, result, anomalies,
         )
 
     return result, anomalies
@@ -153,12 +182,17 @@ def compute_shift_plan_quantities(
     target_date: datetime.date,
     setup_minutes: float = 0.0,
     cycle_minutes_per_item: float = 0.0,
+    machine_type: MachineType = "turning",
 ) -> tuple[dict[str, int], list[dict[str, str]]]:
     """Compute planned quantity for each shift on the target date.
 
     Simulates production from start_dt to end_dt.
     Deducts setup time only on the first shift with overlap.
     Caps cumulative production at qty.
+
+    Uses the shift schedule for the given *machine_type*:
+    - ``"turning"``: 3 shifts (6AM-2PM, 2PM-10PM, 10PM-6AM)
+    - ``"milling"``: 2 shifts (6AM-2:30PM, 2:30PM-11PM)
 
     Returns (shift_quantities, anomalies).
     """
@@ -169,7 +203,9 @@ def compute_shift_plan_quantities(
     total_duration_hours = (end_dt - start_dt).total_seconds() / 3600.0
     speed = total_qty / total_duration_hours if total_duration_hours > 0 else 0
 
+    shift_defs = SHIFTS_BY_TYPE[machine_type]
+
     return _simulate_production(
         start_dt, end_dt, target_date, total_qty,
-        cycle_minutes_per_item, setup_minutes, speed,
+        cycle_minutes_per_item, setup_minutes, speed, shift_defs,
     )

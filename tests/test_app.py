@@ -1,10 +1,26 @@
-import unittest
+import logging
 import os
+import unittest
 from datetime import date
 from streamlit.testing.v1 import AppTest
 
+# Suppress all Streamlit stderr noise (logging + raw pyarrow tracebacks).
+logging.getLogger("streamlit").setLevel(logging.ERROR)
+
 
 class TestApp(unittest.TestCase):
+    def setUp(self) -> None:
+        """Redirect the OS-level stderr fd to devnull to silence pyarrow tracebacks."""
+        self._orig_stderr_fd = os.dup(2)
+        self._devnull_fd = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(self._devnull_fd, 2)
+
+    def tearDown(self) -> None:
+        """Restore the OS-level stderr fd after each test."""
+        os.dup2(self._orig_stderr_fd, 2)
+        os.close(self._orig_stderr_fd)
+        os.close(self._devnull_fd)
+
     def test_app_loads_and_processes_file(self):
         """Test the Streamlit app logic from loading to file download using AppTest naturally."""
         # Initialize the app test pointing to our main app script

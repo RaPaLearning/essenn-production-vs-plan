@@ -69,29 +69,31 @@ class TestGetActiveJobs(unittest.TestCase):
     # --- export_active_jobs ---
 
     def test_export_creates_file_with_jobs(self) -> None:
-        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
-            tmp_path: str = tmp.name
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as active_jobs_file:
+            active_jobs_path: str = active_jobs_file.name
 
         try:
-            export_active_jobs(FIXTURE, "2026-03-10", tmp_path)
-            result: pd.DataFrame = pd.read_excel(tmp_path, header=5)  # type: ignore[reportUnknownMemberType]
+            export_active_jobs(FIXTURE, "2026-03-10", active_jobs_path)
+            result: pd.DataFrame = pd.read_excel(active_jobs_path, header=5)  # type: ignore[reportUnknownMemberType]
             self.assertIn("JOB ORDER No", result.columns)  # type: ignore[reportUnknownMemberType]
             self.assertIn("MACHINE", result.columns)  # type: ignore[reportUnknownMemberType]
             self.assertGreater(len(result), 0)
         finally:
-            os.remove(tmp_path)
+            os.remove(active_jobs_path)
 
     def test_export_empty_date_creates_empty_file(self) -> None:
-        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
-            tmp_path: str = tmp.name
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as active_jobs_file:
+            active_jobs_path: str = active_jobs_file.name
 
         try:
-            export_active_jobs(FIXTURE, "2026-01-01", tmp_path)
-            result: pd.DataFrame = pd.read_excel(tmp_path, header=5)  # type: ignore[reportUnknownMemberType]
+            export_active_jobs(FIXTURE, "2026-01-01", active_jobs_path)
+            result: pd.DataFrame = pd.read_excel(active_jobs_path, header=5)  # type: ignore[reportUnknownMemberType]
             self.assertEqual(len(result), 5)
             self.assertEqual(result.iloc[1]["MACHINE"], "No active jobs scheduled for this shift")
         finally:
-            os.remove(tmp_path)
+            os.remove(active_jobs_path)
+
+
 
     # --- _parse_datetime branch coverage (no pragma: no cover) ---
 

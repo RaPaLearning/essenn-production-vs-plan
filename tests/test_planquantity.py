@@ -58,7 +58,10 @@ class TestComputeShiftPlanQuantities(unittest.TestCase):
         self.assertEqual(result["Shift A"], 150)
         self.assertEqual(result["Shift B"], 0)
         self.assertEqual(result["Shift C"], 0)
-        self.assertEqual(anomalies, [])
+        # Early-completion anomaly is now generated for Shift B
+        self.assertEqual(len(anomalies), 1)
+        self.assertEqual(anomalies[0]["shift"], "Shift B")
+        self.assertIn("fully allocated", anomalies[0]["reason"])
 
     def test_legacy_fallback(self) -> None:
         """When cycle time is 0, use proportional speed allocation."""
@@ -128,3 +131,97 @@ class TestComputeShiftPlanQuantities(unittest.TestCase):
         self.assertEqual(result["Shift A"], 0)
         self.assertEqual(result["Shift B"], 20)
         self.assertEqual(result["Shift C"], 80)
+
+    # --- Machine-specific shift tests ---
+
+    def test_milling_uses_two_shifts(self) -> None:
+        """Milling machines should use 2-shift schedule (6AM-2:30PM, 2:30PM-11PM)."""
+        # Full day job on a milling machine
+        start = datetime.datetime(2026, 3, 10, 6, 0)
+        end = datetime.datetime(2026, 3, 10, 23, 0)
+        target = datetime.date(2026, 3, 10)
+
+        result, anomalies = compute_shift_plan_quantities(
+            qty=1000.0,
+            start_dt=start,
+            end_dt=end,
+            target_date=target,
+            setup_minutes=30.0,
+            cycle_minutes_per_item=1.0,
+            machine_type="milling",
+        )
+
+        # Shift A: 6:00-14:30 = 510 mins, minus 30 setup = 480 -> 480 items
+        self.assertEqual(result["Shift A"], 480)
+        # Shift B: 14:30-23:00 = 510 mins -> 510 items
+        self.assertEqual(result["Shift B"], 510)
+        # No Shift C key for milling
+        self.assertNotIn("Shift C", result)
+        self.assertEqual(anomalies, [])
+
+    def test_milling_result_has_no_shift_c(self) -> None:
+        """Milling result dict should only contain Shift A and Shift B."""
+        start = datetime.datetime(2026, 3, 10, 10, 0)
+        end = datetime.datetime(2026, 3, 10, 16, 0)
+        target = datetime.date(2026, 3, 10)
+
+        result, _ = compute_shift_plan_quantities(
+            qty=100.0,
+            start_dt=start,
+            end_dt=end,
+            target_date=target,
+            machine_type="milling",
+        )
+
+        self.assertIn("Shift A", result)
+        self.assertIn("Shift B", result)
+        self.assertNotIn("Shift C", result)
+
+    def test_turning_still_has_three_shifts(self) -> None:
+        """Turning machines should still get 3 shifts by default."""
+        start = datetime.datetime(2026, 3, 10, 6, 0)
+        end = datetime.datetime(2026, 3, 11, 6, 0)
+        target = datetime.date(2026, 3, 10)
+
+        result, _ = compute_shift_plan_quantities(
+            qty=10000.0,
+            start_dt=start,
+            end_dt=end,
+            target_date=target,
+            cycle_minutes_per_item=1.0,
+            machine_type="turning",
+        )
+
+        self.assertIn("Shift A", result)
+        self.assertIn("Shift B", result)
+        self.assertIn("Shift C", result)
+        # Shift A: 6-14 = 480 mins -> 480
+        self.assertEqual(result["Shift A"], 480)
+        # Shift B: 14-22 = 480 mins -> 480
+        self.assertEqual(result["Shift B"], 480)
+        # Shift C: 22-06 = 480 mins -> 480
+        self.assertEqual(result["Shift C"], 480)
+
+    def test_early_completion_anomaly(self) -> None:
+        """When qty completes early, remaining shifts should show anomaly."""
+        # Job runs 7AM-6PM (covers Shift A and part of Shift B)
+        # but qty=30 finishes well within Shift A
+        start = datetime.datetime(2026, 3, 10, 7, 0)
+        end = datetime.datetime(2026, 3, 10, 18, 0)
+        target = datetime.date(2026, 3, 10)
+
+        result, anomalies = compute_shift_plan_quantities(
+            qty=30.0,
+            start_dt=start,
+            end_dt=end,
+            target_date=target,
+            setup_minutes=10.0,
+            cycle_minutes_per_item=2.0,
+        )
+
+        self.assertEqual(result["Shift A"], 30)
+        self.assertEqual(result["Shift B"], 0)
+        # Should have an anomaly for Shift B
+        shift_b_anomalies = [a for a in anomalies if a["shift"] == "Shift B"]
+        self.assertEqual(len(shift_b_anomalies), 1)
+        self.assertIn("fully allocated", shift_b_anomalies[0]["reason"])
