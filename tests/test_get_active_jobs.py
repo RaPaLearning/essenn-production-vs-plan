@@ -93,27 +93,7 @@ class TestGetActiveJobs(unittest.TestCase):
         finally:
             os.remove(active_jobs_path)
 
-    @patch("write_active_jobs.load_machine_types")
-    def test_export_fallback_when_machine_list_missing(self, mock_load: MagicMock) -> None:
-        """Cover the exception branch in export_active_jobs when Machine List sheet is missing."""
-        mock_load.side_effect = Exception("Worksheet named 'Machine list' not found")
-        
-        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as active_jobs_file:
-            active_jobs_path: str = active_jobs_file.name
 
-        try:
-            # We must pass masterlist_path to trigger the loading attempt
-            # Since load_cycle_times works, we need a valid xlsx for it. We'll mock it too
-            # to keep the test simple.
-            with patch("write_active_jobs.load_cycle_times") as mock_cycle:
-                mock_cycle.return_value = {}
-                export_active_jobs(FIXTURE, "2026-03-10", active_jobs_path, masterlist_path="dummy.xlsx")
-            
-            # The exception should be caught and passed, allowing export to finish
-            result: pd.DataFrame = pd.read_excel(active_jobs_path, header=5)  # type: ignore[reportUnknownMemberType]
-            self.assertGreater(len(result), 0)
-        finally:
-            os.remove(active_jobs_path)
 
     # --- _parse_datetime branch coverage (no pragma: no cover) ---
 

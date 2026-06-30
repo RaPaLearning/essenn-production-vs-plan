@@ -6,7 +6,12 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from get_active_jobs import get_active_jobs
-from setup_cycle_times import CycleTimeLookup, MachineTypeLookup, load_cycle_times, load_machine_types
+from setup_cycle_times import (
+    CycleTimeLookup,
+    MachineTypeLookup,
+    load_cycle_times,
+    load_machine_types,
+)
 
 _SHIFT_TIMINGS: dict[str, tuple[str, str]] = {
     "A": ("Turning: 6:00 AM \u2013 2:00 PM  |  Milling/Citizen: 6:00 AM \u2013 2:30 PM", ""),
@@ -446,10 +451,7 @@ def export_active_jobs(
     machine_type_lookup: MachineTypeLookup | None = None
     if masterlist_path is not None:
         cycle_lookup = load_cycle_times(masterlist_path)
-        try:
-            machine_type_lookup = load_machine_types(masterlist_path)
-        except Exception:  # nosec B110
-            pass  # Machine list sheet may not exist in older masterlists
+        machine_type_lookup = load_machine_types(masterlist_path)
 
     rows, anomalies = get_active_jobs(
         input_path, date_str, cycle_lookup, machine_type_lookup,
