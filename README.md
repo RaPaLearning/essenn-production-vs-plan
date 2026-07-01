@@ -88,7 +88,8 @@ uv sync
 
 ## Running the Code
 
-Run the command in your terminal and open the link displayed in your browser 
+Run the command in your terminal and open the link displayed in your browser
+
 ```bash
 uv run streamlit run app.py
 ```
