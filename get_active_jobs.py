@@ -97,7 +97,8 @@ def _shift_names_for_type(machine_type: MachineType) -> list[str]:
 
 
 def _make_lookup_anomalies(
-    fields: dict[str, Any], machine_type: MachineType,
+    fields: dict[str, Any],
+    machine_type: MachineType,
 ) -> list[dict[str, Any]]:
     """Create anomaly records for all shifts when part is not in master list."""
     reason = f"Part '{fields['part_no']}' / Op '{fields['op_name']}' not found in master list"
@@ -211,7 +212,10 @@ def get_active_jobs(
     anomalies: list[dict[str, Any]] = []
     for df in sheets.values():
         sheet_rows, sheet_anomalies = _process_sheet(
-            df, target, cycle_lookup, machine_type_lookup,
+            df,
+            target,
+            cycle_lookup,
+            machine_type_lookup,
         )
         rows.extend(sheet_rows)
         anomalies.extend(sheet_anomalies)

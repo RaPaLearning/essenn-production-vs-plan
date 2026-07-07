@@ -225,3 +225,24 @@ class TestComputeShiftPlanQuantities(unittest.TestCase):
         shift_b_anomalies = [a for a in anomalies if a["shift"] == "Shift B"]
         self.assertEqual(len(shift_b_anomalies), 1)
         self.assertIn("fully allocated", shift_b_anomalies[0]["reason"])
+
+    def test_sunday_is_skipped(self) -> None:
+        """Jobs spanning across a Sunday should produce zero on Sunday."""
+        # Saturday 2026-07-04 to Monday 2026-07-06
+        # Target = Sunday 2026-07-05 — should get zero for all shifts
+        start = datetime.datetime(2026, 7, 4, 8, 0)
+        end = datetime.datetime(2026, 7, 6, 18, 0)
+        target_sunday = datetime.date(2026, 7, 5)
+
+        result, _ = compute_shift_plan_quantities(
+            qty=10000.0,
+            start_dt=start,
+            end_dt=end,
+            target_date=target_sunday,
+            setup_minutes=10.0,
+            cycle_minutes_per_item=1.0,
+        )
+
+        self.assertEqual(result["Shift A"], 0)
+        self.assertEqual(result["Shift B"], 0)
+        self.assertEqual(result["Shift C"], 0)

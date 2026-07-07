@@ -328,8 +328,14 @@ def _write_anomaly_section(
     # Column headers
     col_row = title_row + 1
     col_headers = [
-        "S.No.", "MACHINE", "JOB ORDER No", "TOTAL QTY",
-        "PART NO", "PART NAME", "OPERATION", "ANOMALY REASON",
+        "S.No.",
+        "MACHINE",
+        "JOB ORDER No",
+        "TOTAL QTY",
+        "PART NO",
+        "PART NAME",
+        "OPERATION",
+        "ANOMALY REASON",
     ]
     for i, h in enumerate(col_headers[:7], 1):
         c = ws.cell(row=col_row, column=i, value=h)  # type: ignore[reportUnknownMemberType]
@@ -454,7 +460,10 @@ def export_active_jobs(
         machine_type_lookup = load_machine_types(masterlist_path)
 
     rows, anomalies = get_active_jobs(
-        input_path, date_str, cycle_lookup, machine_type_lookup,
+        input_path,
+        date_str,
+        cycle_lookup,
+        machine_type_lookup,
     )
 
     # Save workbook with exactly the three shift sheets

@@ -167,4 +167,3 @@ def get_machine_type(
         return lookup[best]
 
     return "turning"
-

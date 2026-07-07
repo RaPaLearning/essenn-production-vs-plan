@@ -200,7 +200,10 @@ class TestLoadMachineTypes(unittest.TestCase):
         blank: list[object] = [None, None, None, None, None]
         header: list[object] = [None, "SL No", "Machine", "Main Group", "Sub group"]
         data_rows: list[list[object]] = [
-            blank, blank, blank, blank,
+            blank,
+            blank,
+            blank,
+            blank,
             header,
             blank,  # row 5: blank separator
             [None, 1, "TestTurning", "Turning", "2axis"],

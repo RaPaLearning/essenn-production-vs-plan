@@ -124,3 +124,19 @@ class TestApp(unittest.TestCase):
         self.assertEqual(
             len(at.dataframe), 0, "Dataframe preview should not be rendered after a failure"
         )
+
+    def test_app_blocks_sunday(self):
+        """Selecting a Sunday should show an error and stop the app."""
+        at = AppTest.from_file("app.py", default_timeout=30)
+        at.run()
+
+        # Set date to a Sunday (July 5, 2026 is a Sunday)
+        at.date_input[0].set_value(date(2026, 7, 5)).run()
+        self.assertFalse(at.exception, "App crashed when selecting a Sunday")
+
+        # Verify the Sunday error message is shown
+        self.assertGreater(len(at.error), 0, "Expected an error when Sunday is selected")
+        self.assertIn(
+            "Sundays are not working days",
+            at.error[0].value,
+        )

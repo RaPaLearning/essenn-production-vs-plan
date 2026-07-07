@@ -24,6 +24,17 @@ SHIFTS_BY_TYPE: dict[MachineType, list[ShiftDef]] = {
 }
 
 
+def _compute_shift_end(
+    current_date: datetime.date,
+    shift_start_time: datetime.time,
+    shift_end_time: datetime.time,
+) -> datetime.datetime:
+    """Compute the shift end datetime, handling midnight crossings."""
+    if shift_end_time <= shift_start_time:
+        return datetime.datetime.combine(current_date + datetime.timedelta(days=1), shift_end_time)
+    return datetime.datetime.combine(current_date, shift_end_time)
+
+
 def get_shifts_in_range(
     start_dt: datetime.datetime,
     end_dt: datetime.datetime,
@@ -34,16 +45,12 @@ def get_shifts_in_range(
     end_date = end_dt.date() + datetime.timedelta(days=1)
 
     while current_date <= end_date:
+        if current_date.weekday() == 6:  # Skip Sundays
+            current_date += datetime.timedelta(days=1)
+            continue
         for shift_name, shift_start_time, shift_end_time in shift_defs:
             s_start = datetime.datetime.combine(current_date, shift_start_time)
-            if shift_end_time <= shift_start_time:
-                # Shift crosses midnight (e.g. 22:00 -> 06:00)
-                s_end = datetime.datetime.combine(
-                    current_date + datetime.timedelta(days=1), shift_end_time
-                )
-            else:
-                s_end = datetime.datetime.combine(current_date, shift_end_time)
-
+            s_end = _compute_shift_end(current_date, shift_start_time, shift_end_time)
             yield (shift_name, current_date, s_start, s_end)
 
         current_date += datetime.timedelta(days=1)
@@ -130,10 +137,12 @@ def _record_target_shift(
     if anomaly_reason:
         anomalies.append({"shift": shift_name, "reason": anomaly_reason})
     elif qty_was_capped and produced == 0:
-        anomalies.append({
-            "shift": shift_name,
-            "reason": "Planned quantity fully allocated before this shift",
-        })
+        anomalies.append(
+            {
+                "shift": shift_name,
+                "reason": "Planned quantity fully allocated before this shift",
+            }
+        )
 
 
 def _simulate_production(
@@ -168,8 +177,14 @@ def _simulate_production(
         cumulative_qty += produced
 
         _record_target_shift(
-            shift_name, shift_date, target_date, produced, anomaly_reason,
-            qty_was_capped, result, anomalies,
+            shift_name,
+            shift_date,
+            target_date,
+            produced,
+            anomaly_reason,
+            qty_was_capped,
+            result,
+            anomalies,
         )
 
     return result, anomalies
@@ -206,6 +221,12 @@ def compute_shift_plan_quantities(
     shift_defs = SHIFTS_BY_TYPE[machine_type]
 
     return _simulate_production(
-        start_dt, end_dt, target_date, total_qty,
-        cycle_minutes_per_item, setup_minutes, speed, shift_defs,
+        start_dt,
+        end_dt,
+        target_date,
+        total_qty,
+        cycle_minutes_per_item,
+        setup_minutes,
+        speed,
+        shift_defs,
     )
