@@ -93,8 +93,6 @@ class TestGetActiveJobs(unittest.TestCase):
         finally:
             os.remove(active_jobs_path)
 
-
-
     # --- _parse_datetime branch coverage (no pragma: no cover) ---
 
     def test_parse_datetime_returns_none_for_nan(self) -> None:
@@ -114,6 +112,7 @@ class TestGetActiveJobs(unittest.TestCase):
         """Cover the start_dt is None or end_dt is None check in _process_row."""
         # Setup row with valid dates so _parse_date passes
         import datetime
+
         row = pd.Series([None] * 12)
         row.iloc[0] = "J001"
         row.iloc[8] = "10/03/2026"

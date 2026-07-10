@@ -19,6 +19,28 @@ MASTERLIST_PATH: str = str(
 )
 
 
+def _process_upload(
+    uploaded_file: st.runtime.uploaded_file_manager.UploadedFile,  # type: ignore[reportUnknownParameterType]
+    selected_date: date,
+) -> bytes:
+    """Process the uploaded XLSX and return the output Excel bytes."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        input_path = Path(tmpdir) / "input.xlsx"
+        output_path = Path(tmpdir) / "output.xlsx"
+
+        input_path.write_bytes(uploaded_file.getvalue())  # type: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+
+        date_str = selected_date.strftime("%Y-%m-%d")
+        export_active_jobs(
+            str(input_path),
+            date_str,
+            str(output_path),
+            masterlist_path=MASTERLIST_PATH,
+        )
+
+        return output_path.read_bytes()
+
+
 def main() -> None:
     st.set_page_config(
         page_title="Operations Extractor",
@@ -35,67 +57,65 @@ def main() -> None:
         format="DD-MM-YYYY",
     )
 
+    if selected_date.weekday() == 6:  # type: ignore[union-attr]
+        st.error("Sundays are not working days. Please select a valid working day.")
+        st.stop()
+
     uploaded_file = st.file_uploader("Choose an XLSX file", type="xlsx")
 
     if uploaded_file is not None:
-        file_hash = f"{getattr(uploaded_file, 'file_id', uploaded_file.name)}_{uploaded_file.size}"
-        state_key = f"processed_{file_hash}_{selected_date}"
+        _handle_upload(uploaded_file, selected_date)
 
-        if state_key not in st.session_state:
-            with st.spinner("Processing file..."):
-                try:
-                    with tempfile.TemporaryDirectory() as tmpdir:
-                        input_path = Path(tmpdir) / "input.xlsx"
-                        output_path = Path(tmpdir) / "output.xlsx"
 
-                        input_path.write_bytes(uploaded_file.getvalue())
+def _handle_upload(
+    uploaded_file: st.runtime.uploaded_file_manager.UploadedFile,  # type: ignore[reportUnknownParameterType]
+    selected_date: date,
+) -> None:
+    """Process an uploaded file and render results."""
+    file_hash = f"{getattr(uploaded_file, 'file_id', uploaded_file.name)}_{uploaded_file.size}"  # type: ignore[reportUnknownArgumentType, reportUnknownMemberType]
+    state_key = f"processed_{file_hash}_{selected_date}"
 
-                        date_str = selected_date.strftime("%Y-%m-%d")
-                        export_active_jobs(
-                            str(input_path),
-                            date_str,
-                            str(output_path),
-                            masterlist_path=MASTERLIST_PATH,
-                        )
+    if state_key not in st.session_state:
+        with st.spinner("Processing file..."):
+            try:
+                st.session_state[state_key] = _process_upload(uploaded_file, selected_date)  # type: ignore[reportUnknownArgumentType]
+            except Exception as e:
+                st.error(f"Error processing file: {e}")
+                return
 
-                        st.session_state[state_key] = output_path.read_bytes()
-                except Exception as e:
-                    st.error(f"Error processing file: {e}")
-                    return
+    mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-        mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    st.download_button(
+        label="Download Summary Report",
+        data=st.session_state[state_key],
+        file_name=f"operations_summary_{selected_date}.xlsx",
+        mime=mime_type,
+    )
 
-        st.download_button(
-            label="Download Summary Report",
-            data=st.session_state[state_key],
-            file_name=f"operations_summary_{selected_date}.xlsx",
-            mime=mime_type,
-        )
-
-        st.subheader("Preview Summary")
-        preview_df: pd.DataFrame = pd.read_excel(  # type: ignore[reportUnknownMemberType]
-            io.BytesIO(st.session_state[state_key]),
-            sheet_name="Shift A",
-            header=5,
-        )
-        # Keep only the 7 data columns from the issue scope
-        keep_cols = [
-            "MACHINE",
-            "JOB ORDER No",
-            "TOTAL QTY",
-            "PART NO",
-            "PART NAME",
-            "OPERATION",
-            "PLAN QTY",
-        ]
-        preview_df = preview_df[[c for c in keep_cols if c in preview_df.columns]]
-        # Drop rows that are not actual job data (sub-headers, blanks, signature rows)
-        preview_df = preview_df.dropna(subset=["JOB ORDER No"])
-        preview_df = preview_df[
-            ~preview_df["JOB ORDER No"].astype(str).str.contains("Sign|None|OK|Rej", na=True)
-        ]
-        preview_df = preview_df.reset_index(drop=True)
-        st.dataframe(preview_df, width="stretch")
+    st.subheader("Preview Summary")
+    preview_df: pd.DataFrame = pd.read_excel(  # type: ignore[reportUnknownMemberType]
+        io.BytesIO(st.session_state[state_key]),
+        sheet_name="Shift A",
+        header=5,
+    )
+    # Keep only the 7 data columns from the issue scope
+    keep_cols = [
+        "MACHINE",
+        "JOB ORDER No",
+        "TOTAL QTY",
+        "PART NO",
+        "PART NAME",
+        "OPERATION",
+        "PLAN QTY",
+    ]
+    preview_df = preview_df[[c for c in keep_cols if c in preview_df.columns]]
+    # Drop rows that are not actual job data (sub-headers, blanks, signature rows)
+    preview_df = preview_df.dropna(subset=["JOB ORDER No"])
+    preview_df = preview_df[
+        ~preview_df["JOB ORDER No"].astype(str).str.contains("Sign|None|OK|Rej", na=True)
+    ]
+    preview_df = preview_df.reset_index(drop=True)
+    st.dataframe(preview_df, width="stretch")
 
 
 if __name__ == "__main__":
