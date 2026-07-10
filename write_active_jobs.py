@@ -5,7 +5,7 @@ import openpyxl
 from openpyxl.comments import Comment
 from openpyxl.formatting.rule import FormulaRule  # type: ignore[reportUnknownVariableType]
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
-from openpyxl.utils import get_column_letter
+from openpyxl.utils import column_index_from_string, get_column_letter
 
 from get_active_jobs import get_active_jobs
 from setup_cycle_times import (
@@ -21,6 +21,26 @@ _SHIFT_TIMINGS: dict[str, tuple[str, str]] = {
     "C": ("Turning: 10:00 PM \u2013 6:00 AM", ""),
 }
 
+_HEADERS: dict[str, str] = {
+    "A6": "S.No.",
+    "B6": "MACHINE",
+    "C6": "JOB ORDER No",
+    "D6": "TOTAL QTY",
+    "E6": "PART NO",
+    "F6": "PART NAME",
+    "G6": "OPERATION",
+    "H6": "PLAN QTY",
+    "I6": "ACTUAL QTY",
+    "I7": "OK QTY",
+    "J7": "Rej QTY",
+    "K6": "%",
+    "L6": "REMARKS",
+    "M6": "Operator Name",
+    "N6": "Sign",
+}
+_NUM_COLS: int = max(column_index_from_string(ref.rstrip("0123456789")) for ref in _HEADERS)
+_LAST_COL: str = get_column_letter(_NUM_COLS)
+
 
 def _make_border(
     thin: Side,
@@ -32,7 +52,7 @@ def _make_border(
     """Create a cell border with thick edges on row/column boundaries."""
     return Border(
         left=thick if col == 1 else thin,
-        right=thick if col == 14 else thin,
+        right=thick if col == _NUM_COLS else thin,
         top=thick if is_top_thick else thin,
         bottom=thick if is_bottom_thick else thin,
     )
@@ -53,7 +73,7 @@ def _write_header(
     ws.merge_cells("A1:B1")  # type: ignore[reportUnknownMemberType]
     ws["A1"] = "DATE:"  # type: ignore[reportUnknownMemberType]
     ws["A1"].font = bold_font  # type: ignore[reportUnknownMemberType]
-    ws.merge_cells("C1:N1")  # type: ignore[reportUnknownMemberType]
+    ws.merge_cells(f"C1:{_LAST_COL}1")  # type: ignore[reportUnknownMemberType]
     ws["C1"] = formatted_date  # type: ignore[reportUnknownMemberType]
     ws["C1"].font = meta_font  # type: ignore[reportUnknownMemberType]
     ws["C1"].alignment = Alignment(horizontal="left", vertical="center", shrink_to_fit=True)  # type: ignore[reportUnknownMemberType]
@@ -61,13 +81,13 @@ def _write_header(
     ws.merge_cells("A2:B2")  # type: ignore[reportUnknownMemberType]
     ws["A2"] = "SHIFT:"  # type: ignore[reportUnknownMemberType]
     ws["A2"].font = bold_font  # type: ignore[reportUnknownMemberType]
-    ws.merge_cells("C2:N2")  # type: ignore[reportUnknownMemberType]
+    ws.merge_cells(f"C2:{_LAST_COL}2")  # type: ignore[reportUnknownMemberType]
     ws["C2"] = f"Shift {label}"  # type: ignore[reportUnknownMemberType]
     ws["C2"].font = meta_font  # type: ignore[reportUnknownMemberType]
     ws["C2"].alignment = Alignment(horizontal="left", vertical="center", shrink_to_fit=True)  # type: ignore[reportUnknownMemberType]
 
     for r in [1, 2]:
-        for c in range(1, 15):
+        for c in range(1, _NUM_COLS + 1):
             ws.cell(row=r, column=c).border = _make_border(  # type: ignore[reportUnknownMemberType]
                 thin,
                 thick,
@@ -80,7 +100,7 @@ def _write_header(
     timing_text = _SHIFT_TIMINGS.get(label, ("", ""))[0]
     if timing_text:
         note_font = Font(name="Arial", size=8, italic=True, color="555555")
-        ws.merge_cells("A3:N3")  # type: ignore[reportUnknownMemberType]
+        ws.merge_cells(f"A3:{_LAST_COL}3")  # type: ignore[reportUnknownMemberType]
         ws["A3"] = timing_text  # type: ignore[reportUnknownMemberType]
         ws["A3"].font = note_font  # type: ignore[reportUnknownMemberType]
         ws["A3"].alignment = Alignment(horizontal="left", vertical="center", shrink_to_fit=True)  # type: ignore[reportUnknownMemberType]
@@ -97,8 +117,8 @@ def _style_row(
     fill: PatternFill | None = None,
     align: Alignment | None = None,
 ) -> None:
-    """Apply uniform styling to all 13 columns of a single row."""
-    for c in range(1, 15):
+    """Apply uniform styling to all columns of a single row."""
+    for c in range(1, _NUM_COLS + 1):
         cell = ws.cell(row=r, column=c)  # type: ignore[reportUnknownMemberType]
         cell.font = font  # type: ignore[reportUnknownMemberType]
         cell.border = _make_border(  # type: ignore[reportUnknownMemberType]
@@ -140,24 +160,7 @@ def _write_table_headers(
         ws.merge_cells(m)  # type: ignore[reportUnknownMemberType]
     ws.merge_cells("I6:J6")  # type: ignore[reportUnknownMemberType]
 
-    headers = {
-        "A6": "S.No.",
-        "B6": "MACHINE",
-        "C6": "JOB ORDER No",
-        "D6": "TOTAL QTY",
-        "E6": "PART NO",
-        "F6": "PART NAME",
-        "G6": "OPERATION",
-        "H6": "PLAN QTY",
-        "I6": "ACTUAL QTY",
-        "I7": "OK QTY",
-        "J7": "Rej QTY",
-        "K6": "%",
-        "L6": "REMARKS",
-        "M6": "Operator Name",
-        "N6": "Sign",
-    }
-    for cell_ref, value in headers.items():
+    for cell_ref, value in _HEADERS.items():
         ws[cell_ref] = value  # type: ignore[reportUnknownMemberType]
 
     center = Alignment(
@@ -209,19 +212,19 @@ def _write_single_data_row(
         ws.cell(row=r_num, column=col_i, value=row.get(key, ""))  # type: ignore[reportUnknownMemberType]
 
     # Efficiency % formula in column K (11): auto-calculates when OK QTY is entered
-    eff_formula = f'=IF(H{r_num}>0,I{r_num}/H{r_num}*100,"")'
+    eff_formula = f'=IF(H{r_num}>0,ROUND(I{r_num}/H{r_num}*100,0),"")'
     ws.cell(row=r_num, column=11, value=eff_formula)  # type: ignore[reportUnknownMemberType]
 
     for c in [9, 10, 12, 13, 14]:
         ws.cell(row=r_num, column=c, value="")  # type: ignore[reportUnknownMemberType]
 
     if is_anomaly:
-        ws.cell(row=r_num, column=8).comment = Comment(  # type: ignore[reportUnknownMemberType]
-            row["Anomaly"],
-            "System",
-        )
+        fill_pink = PatternFill(start_color="FFE0E0", end_color="FFE0E0", fill_type="solid")
+        plan_cell = ws.cell(row=r_num, column=8)  # type: ignore[reportUnknownMemberType]
+        plan_cell.fill = fill_pink  # type: ignore[reportUnknownMemberType]
+        plan_cell.comment = Comment(row["Anomaly"], "System")  # type: ignore[reportUnknownMemberType]
 
-    _style_data_cells(ws, r_num, data_font, thin, thick, is_last, is_anomaly)  # type: ignore[reportUnknownArgumentType]
+    _style_data_cells(ws, r_num, data_font, thin, thick, is_last)  # type: ignore[reportUnknownArgumentType]
 
 
 def _style_data_cells(
@@ -231,19 +234,15 @@ def _style_data_cells(
     thin: Side,
     thick: Side,
     is_last: bool,
-    is_anomaly: bool,
 ) -> None:
-    """Apply font, border, alignment, and optional anomaly fill to a data row."""
+    """Apply font, border, and alignment to a data row."""
     center_cols = {1, 4, 8, 9, 10, 11}
-    fill_pink = PatternFill(start_color="FFE0E0", end_color="FFE0E0", fill_type="solid")
-    for c in range(1, 15):
+    for c in range(1, _NUM_COLS + 1):
         cell = ws.cell(row=r_num, column=c)  # type: ignore[reportUnknownMemberType]
         cell.font = data_font  # type: ignore[reportUnknownMemberType]
         cell.border = _make_border(thin, thick, c, False, is_last)  # type: ignore[reportUnknownMemberType]
         h = "center" if c in center_cols else "left"
         cell.alignment = Alignment(horizontal=h, vertical="center", shrink_to_fit=True)  # type: ignore[reportUnknownMemberType]
-        if is_anomaly:
-            cell.fill = fill_pink  # type: ignore[reportUnknownMemberType]
 
 
 def _write_empty_row(
@@ -265,7 +264,7 @@ def _write_empty_row(
         start_row=start_row,
         start_column=2,
         end_row=start_row,
-        end_column=14,
+        end_column=_NUM_COLS,
     )
     _style_row(
         ws,  # type: ignore[reportUnknownArgumentType]
