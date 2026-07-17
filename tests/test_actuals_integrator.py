@@ -199,5 +199,3 @@ class TestActualsIntegrator(unittest.TestCase):
         self.assertEqual(wb["Shift A"].cell(row=8, column=9).value, 119)
 
 
-if __name__ == "__main__":
-    unittest.main()

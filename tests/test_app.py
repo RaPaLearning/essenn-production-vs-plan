@@ -252,9 +252,6 @@ class TestIntegratorPage(_SilenceStderr):
         at = AppTest.from_file("pages/1_Actuals_Integrator.py", default_timeout=30)
         at.run()
         back_button = next(b for b in at.button if "Back to Home" in b.label)
-        try:
-            back_button.click().run()
-        except Exception:  # nosec B110
-            pass
+        back_button.click().run()
         self.assertTrue(at.exception)
         self.assertIn("Could not find page", str(at.exception[0]))
