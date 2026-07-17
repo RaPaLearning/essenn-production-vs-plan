@@ -1,4 +1,5 @@
 .venv
+.venv_new
 node_modules
 .ruff_cache
 .pytest_cache

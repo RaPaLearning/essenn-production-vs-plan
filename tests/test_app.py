@@ -1,7 +1,11 @@
+import io
 import logging
 import os
 import unittest
 from datetime import date
+
+import openpyxl
+import pandas as pd
 from streamlit.testing.v1 import AppTest
 
 # Suppress all Streamlit stderr noise (logging + raw pyarrow tracebacks).
@@ -140,3 +144,122 @@ class TestApp(unittest.TestCase):
             "Sundays are not working days",
             at.error[0].value,
         )
+
+
+class TestIntegratorPage(unittest.TestCase):
+    """Tests for the Actuals Integrator page."""
+
+    def setUp(self) -> None:
+        self._orig_stderr_fd = os.dup(2)
+        self._devnull_fd = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(self._devnull_fd, 2)
+
+    def tearDown(self) -> None:
+        os.dup2(self._orig_stderr_fd, 2)
+        os.close(self._orig_stderr_fd)
+        os.close(self._devnull_fd)
+
+    def test_integrator_page_loads(self) -> None:
+        """The integrator page should load without errors."""
+        at = AppTest.from_file(
+            "pages/1_Actuals_Integrator.py",
+            default_timeout=30,
+        )
+        at.run()
+        self.assertFalse(at.exception, f"Page crashed: {at.exception}")
+        self.assertEqual(at.title[0].value, "🔗 Actuals Integrator")
+
+    def test_integrator_handles_invalid_tpm(self) -> None:
+        """Uploading invalid TPM data should show an error."""
+        at = AppTest.from_file(
+            "pages/1_Actuals_Integrator.py",
+            default_timeout=30,
+        )
+        at.run()
+
+        # Minimal valid summary
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Shift A"  # type: ignore[union-attr]
+        ws["C1"] = "11-05-2026"  # type: ignore[index]
+        out = io.BytesIO()
+        wb.save(out)
+
+        mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+        at.file_uploader("integrator_summary").set_value(
+            [("summary.xlsx", out.getvalue(), mime)],
+        ).run()
+
+        at.file_uploader("integrator_tpm").set_value(
+            [("bad.xlsx", b"not excel", mime)],
+        ).run()
+
+        self.assertFalse(at.exception, f"App crashed: {at.exception}")
+        self.assertGreater(len(at.error), 0)
+        self.assertIn("Error integrating", at.error[0].value)
+
+    def test_integrator_success(self) -> None:
+        """Valid summary + valid TPM should show download button."""
+        at = AppTest.from_file(
+            "pages/1_Actuals_Integrator.py",
+            default_timeout=30,
+        )
+        at.run()
+
+        # Build a minimal summary with a data row
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Shift A"  # type: ignore[union-attr]
+        ws["C1"] = "11-05-2026"  # type: ignore[index]
+        ws.cell(row=8, column=2).value = "ACE COLT"  # type: ignore[union-attr]
+        ws.cell(row=8, column=5).value = "766 0012 00 00 001"  # type: ignore[union-attr]
+        ws.cell(row=8, column=7).value = "10"  # type: ignore[union-attr]
+        s_out = io.BytesIO()
+        wb.save(s_out)
+
+        # Build a valid TPM file
+        tpm_out = io.BytesIO()
+        with pd.ExcelWriter(tpm_out, engine="openpyxl") as writer:
+            blank = pd.DataFrame([[""] * 5] * 6)
+            blank.to_excel(writer, index=False, header=False, startrow=0)  # type: ignore[reportUnknownMemberType]
+            tpm_df = pd.DataFrame(
+                {
+                    "SHIFT": ["Shift A"],
+                    "DATE": ["11/05/2026"],
+                    "MACHINE": ["ACE COLT"],
+                    "COMPONENT": ["766 0012 00 00 001"],
+                    "OPN NO.": ["10"],
+                    "ACTUAL": [119],
+                },
+            )
+            tpm_df.to_excel(writer, index=False, header=True, startrow=6)  # type: ignore[reportUnknownMemberType]
+
+        mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+        at.file_uploader("integrator_summary").set_value(
+            [("summary.xlsx", s_out.getvalue(), mime)],
+        ).run()
+
+        at.file_uploader("integrator_tpm").set_value(
+            [("tpm.xlsx", tpm_out.getvalue(), mime)],
+        ).run()
+
+        self.assertFalse(at.exception, f"App crashed: {at.exception}")
+
+        self.assertGreater(len(at.success), 0)
+        has_download = any(
+            getattr(e, "type", type(e).__name__) == "download_button" for e in at.main
+        )
+        self.assertTrue(has_download)
+
+    def test_integrator_page_back_button(self) -> None:
+        at = AppTest.from_file("pages/1_Actuals_Integrator.py", default_timeout=30)
+        at.run()
+        back_button = next(b for b in at.button if "Back to Home" in b.label)
+        try:
+            back_button.click().run()
+        except Exception:  # nosec B110
+            pass
+        self.assertTrue(at.exception)
+        self.assertIn("Could not find page", str(at.exception[0]))
