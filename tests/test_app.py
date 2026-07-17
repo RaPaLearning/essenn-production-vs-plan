@@ -12,7 +12,9 @@ from streamlit.testing.v1 import AppTest
 logging.getLogger("streamlit").setLevel(logging.ERROR)
 
 
-class TestApp(unittest.TestCase):
+class _SilenceStderr(unittest.TestCase):
+    """Shared base that redirects stderr to devnull during tests."""
+
     def setUp(self) -> None:
         """Redirect the OS-level stderr fd to devnull to silence pyarrow tracebacks."""
         self._orig_stderr_fd = os.dup(2)
@@ -24,6 +26,9 @@ class TestApp(unittest.TestCase):
         os.dup2(self._orig_stderr_fd, 2)
         os.close(self._orig_stderr_fd)
         os.close(self._devnull_fd)
+
+
+class TestApp(_SilenceStderr):
 
     def test_app_loads_and_processes_file(self):
         """Test the Streamlit app logic from loading to file download using AppTest naturally."""
@@ -146,18 +151,8 @@ class TestApp(unittest.TestCase):
         )
 
 
-class TestIntegratorPage(unittest.TestCase):
+class TestIntegratorPage(_SilenceStderr):
     """Tests for the Actuals Integrator page."""
-
-    def setUp(self) -> None:
-        self._orig_stderr_fd = os.dup(2)
-        self._devnull_fd = os.open(os.devnull, os.O_WRONLY)
-        os.dup2(self._devnull_fd, 2)
-
-    def tearDown(self) -> None:
-        os.dup2(self._orig_stderr_fd, 2)
-        os.close(self._orig_stderr_fd)
-        os.close(self._devnull_fd)
 
     def test_integrator_page_loads(self) -> None:
         """The integrator page should load without errors."""

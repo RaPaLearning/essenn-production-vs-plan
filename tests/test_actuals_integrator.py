@@ -72,65 +72,53 @@ class TestActualsIntegrator(unittest.TestCase):
             )
         return out.getvalue()
 
+    def _get_default_tpm_data(self) -> dict[str, list[object]]:
+        """Return a default TPM data dictionary for testing."""
+        return {
+            "SHIFT": ["Shift A"],
+            "DATE": ["11/05/2026"],
+            "MACHINE": ["ACE COLT"],
+            "COMPONENT": ["766 0012 00 00 001"],
+            "OPN NO.": ["10"],
+            "ACTUAL": [119],
+        }
+
+    def _process_and_load(self, summary: bytes, tpm_files: list[bytes]) -> openpyxl.Workbook:
+        """Helper to run the integrator and load the resulting workbook."""
+        result = process_actuals(summary, tpm_files)
+        return openpyxl.load_workbook(io.BytesIO(result))
+
     def test_matching_fills_ok_qty(self) -> None:
         """A matching TPM row should fill OK QTY."""
         summary = self._create_summary_bytes()
-        tpm = self._create_tpm_bytes(
-            {
-                "SHIFT": ["Shift A"],
-                "DATE": ["11/05/2026"],
-                "MACHINE": ["ACE COLT"],
-                "COMPONENT": ["766 0012 00 00 001"],
-                "OPN NO.": ["10"],
-                "ACTUAL": [119],
-            },
-        )
-        result = process_actuals(summary, [tpm])
-        wb = openpyxl.load_workbook(io.BytesIO(result))
+        tpm = self._create_tpm_bytes(self._get_default_tpm_data())
+        wb = self._process_and_load(summary, [tpm])
         self.assertEqual(wb["Shift A"].cell(row=8, column=9).value, 119)
 
     def test_no_match_leaves_ok_qty_empty(self) -> None:
         """No matching TPM data leaves OK QTY untouched."""
         summary = self._create_summary_bytes()
-        tpm = self._create_tpm_bytes(
-            {
-                "SHIFT": ["Shift A"],
-                "DATE": ["11/05/2026"],
-                "MACHINE": ["OTHER MACHINE"],
-                "COMPONENT": ["DIFFERENT-PART"],
-                "OPN NO.": ["20"],
-                "ACTUAL": [999],
-            },
-        )
-        result = process_actuals(summary, [tpm])
-        wb = openpyxl.load_workbook(io.BytesIO(result))
+        data = self._get_default_tpm_data()
+        data.update({
+            "MACHINE": ["OTHER MACHINE"],
+            "COMPONENT": ["DIFFERENT-PART"],
+            "OPN NO.": ["20"],
+            "ACTUAL": [999],
+        })
+        tpm = self._create_tpm_bytes(data)
+        wb = self._process_and_load(summary, [tpm])
         self.assertIsNone(wb["Shift A"].cell(row=8, column=9).value)
 
     def test_multiple_tpm_files_summed(self) -> None:
         """Actuals from multiple TPM files should be summed."""
         summary = self._create_summary_bytes()
-        tpm1 = self._create_tpm_bytes(
-            {
-                "SHIFT": ["Shift A"],
-                "DATE": ["11/05/2026"],
-                "MACHINE": ["ACE COLT"],
-                "COMPONENT": ["766 0012 00 00 001"],
-                "OPN NO.": ["10"],
-                "ACTUAL": [100],
-            },
-        )
-        tpm2 = self._create_tpm_bytes(
-            {
-                "SHIFT": ["Shift A"],
-                "DATE": ["11/05/2026"],
-                "MACHINE": ["ACE COLT"],
-                "COMPONENT": ["766 0012 00 00 001"],
-                "OPN NO.": ["10"],
-                "ACTUAL": [50],
-            },
-        )
-        result = process_actuals(summary, [tpm1, tpm2])
-        wb = openpyxl.load_workbook(io.BytesIO(result))
+        data1 = self._get_default_tpm_data()
+        data1["ACTUAL"] = [100]
+        tpm1 = self._create_tpm_bytes(data1)
+        data2 = self._get_default_tpm_data()
+        data2["ACTUAL"] = [50]
+        tpm2 = self._create_tpm_bytes(data2)
+        wb = self._process_and_load(summary, [tpm1, tpm2])
         self.assertEqual(wb["Shift A"].cell(row=8, column=9).value, 150)
 
     def test_invalid_tpm_raises(self) -> None:
@@ -142,35 +130,20 @@ class TestActualsIntegrator(unittest.TestCase):
     def test_shift_data_empty_skips(self) -> None:
         """TPM data for a different shift does not fill OK QTY."""
         summary = self._create_summary_bytes()
-        tpm = self._create_tpm_bytes(
-            {
-                "SHIFT": ["Shift C"],
-                "DATE": ["11/05/2026"],
-                "MACHINE": ["ACE COLT"],
-                "COMPONENT": ["766 0012 00 00 001"],
-                "OPN NO.": ["10"],
-                "ACTUAL": [100],
-            },
-        )
-        result = process_actuals(summary, [tpm])
-        wb = openpyxl.load_workbook(io.BytesIO(result))
+        data = self._get_default_tpm_data()
+        data["SHIFT"] = ["Shift C"]
+        data["ACTUAL"] = [100]
+        tpm = self._create_tpm_bytes(data)
+        wb = self._process_and_load(summary, [tpm])
         self.assertIsNone(wb["Shift A"].cell(row=8, column=9).value)
 
     def test_zero_actual_skips(self) -> None:
         """Zero actual total does not fill OK QTY."""
         summary = self._create_summary_bytes()
-        tpm = self._create_tpm_bytes(
-            {
-                "SHIFT": ["Shift A"],
-                "DATE": ["11/05/2026"],
-                "MACHINE": ["ACE COLT"],
-                "COMPONENT": ["766 0012 00 00 001"],
-                "OPN NO.": ["10"],
-                "ACTUAL": [0],
-            },
-        )
-        result = process_actuals(summary, [tpm])
-        wb = openpyxl.load_workbook(io.BytesIO(result))
+        data = self._get_default_tpm_data()
+        data["ACTUAL"] = [0]
+        tpm = self._create_tpm_bytes(data)
+        wb = self._process_and_load(summary, [tpm])
         self.assertIsNone(wb["Shift A"].cell(row=8, column=9).value)
 
     def test_empty_part_row_skips(self) -> None:
@@ -181,40 +154,24 @@ class TestActualsIntegrator(unittest.TestCase):
         out = io.BytesIO()
         wb.save(out)
 
-        tpm = self._create_tpm_bytes(
-            {
-                "SHIFT": ["Shift A"],
-                "DATE": ["11/05/2026"],
-                "MACHINE": ["ACE COLT"],
-                "COMPONENT": ["766 0012 00 00 001"],
-                "OPN NO.": ["10"],
-                "ACTUAL": [100],
-            },
-        )
-        result = process_actuals(out.getvalue(), [tpm])
-        wb2 = openpyxl.load_workbook(io.BytesIO(result))
+        data = self._get_default_tpm_data()
+        data["ACTUAL"] = [100]
+        tpm = self._create_tpm_bytes(data)
+        wb2 = self._process_and_load(out.getvalue(), [tpm])
         self.assertIsNone(wb2["Shift A"].cell(row=8, column=9).value)
 
     def test_missing_or_invalid_date_skips(self) -> None:
         """If date is missing or invalid in summary, the sheet is skipped."""
-        tpm = self._create_tpm_bytes(
-            {
-                "SHIFT": ["Shift A"],
-                "DATE": ["11/05/2026"],
-                "MACHINE": ["ACE COLT"],
-                "COMPONENT": ["766 0012 00 00 001"],
-                "OPN NO.": ["10"],
-                "ACTUAL": [100],
-            },
-        )
+        data = self._get_default_tpm_data()
+        data["ACTUAL"] = [100]
+        tpm = self._create_tpm_bytes(data)
 
         # 1. Missing date
         wb = openpyxl.load_workbook(io.BytesIO(self._create_summary_bytes()))
         wb["Shift A"]["C1"] = None
         out = io.BytesIO()
         wb.save(out)
-        result1 = process_actuals(out.getvalue(), [tpm])
-        wb1 = openpyxl.load_workbook(io.BytesIO(result1))
+        wb1 = self._process_and_load(out.getvalue(), [tpm])
         self.assertIsNone(wb1["Shift A"].cell(row=8, column=9).value)
 
         # 2. Invalid date format
@@ -222,8 +179,7 @@ class TestActualsIntegrator(unittest.TestCase):
         wb["Shift A"]["C1"] = "invalid-date"
         out2 = io.BytesIO()
         wb.save(out2)
-        result2 = process_actuals(out2.getvalue(), [tpm])
-        wb2 = openpyxl.load_workbook(io.BytesIO(result2))
+        wb2 = self._process_and_load(out2.getvalue(), [tpm])
         self.assertIsNone(wb2["Shift A"].cell(row=8, column=9).value)
 
     def test_tpm_no_headers_skips(self) -> None:
@@ -234,22 +190,12 @@ class TestActualsIntegrator(unittest.TestCase):
             df.to_excel(writer, index=False, header=True, startrow=0)  # type: ignore[reportUnknownMemberType]
         tpm_no_headers = out.getvalue()
 
-        tpm_valid = self._create_tpm_bytes(
-            {
-                "SHIFT": ["Shift A"],
-                "DATE": ["11/05/2026"],
-                "MACHINE": ["ACE COLT"],
-                "COMPONENT": ["766 0012 00 00 001"],
-                "OPN NO.": ["10"],
-                "ACTUAL": [119],
-            },
-        )
+        tpm_valid = self._create_tpm_bytes(self._get_default_tpm_data())
 
         summary = self._create_summary_bytes()
         # Mix the invalid one with a valid one so it doesn't just
         # raise ValueError for "no valid files"
-        result = process_actuals(summary, [tpm_no_headers, tpm_valid])
-        wb = openpyxl.load_workbook(io.BytesIO(result))
+        wb = self._process_and_load(summary, [tpm_no_headers, tpm_valid])
         self.assertEqual(wb["Shift A"].cell(row=8, column=9).value, 119)
 
 
