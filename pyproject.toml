@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
     "pandas>=3.0.3",
     "openpyxl>=3.1.0",
-    "streamlit>=1.59.2",
+    "streamlit>=1.60.0",
     "xlrd>=2.0.2",
 ]
 
