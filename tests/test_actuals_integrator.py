@@ -99,12 +99,14 @@ class TestActualsIntegrator(unittest.TestCase):
         """No matching TPM data leaves OK QTY untouched."""
         summary = self._create_summary_bytes()
         data = self._get_default_tpm_data()
-        data.update({
-            "MACHINE": ["OTHER MACHINE"],
-            "COMPONENT": ["DIFFERENT-PART"],
-            "OPN NO.": ["20"],
-            "ACTUAL": [999],
-        })
+        data.update(
+            {
+                "MACHINE": ["OTHER MACHINE"],
+                "COMPONENT": ["DIFFERENT-PART"],
+                "OPN NO.": ["20"],
+                "ACTUAL": [999],
+            }
+        )
         tpm = self._create_tpm_bytes(data)
         wb = self._process_and_load(summary, [tpm])
         self.assertIsNone(wb["Shift A"].cell(row=8, column=9).value)
@@ -197,5 +199,3 @@ class TestActualsIntegrator(unittest.TestCase):
         # raise ValueError for "no valid files"
         wb = self._process_and_load(summary, [tpm_no_headers, tpm_valid])
         self.assertEqual(wb["Shift A"].cell(row=8, column=9).value, 119)
-
-

@@ -1,9 +1,9 @@
-"""Step 3: Actuals Integrator page."""
+"""Actuals Integrator page."""
 
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent))
 
 import streamlit as st
 
@@ -55,14 +55,6 @@ def _handle_integrator(
 
 def main() -> None:
     """Render the Actuals Integrator page."""
-    st.set_page_config(
-        page_title="Actuals Integrator",
-        page_icon="🔗",
-    )
-
-    if st.button("← Back to Home"):
-        st.switch_page("app.py")
-
     st.title("🔗 Actuals Integrator")
     st.write(
         "Upload your Operations Summary and TPM IoT data"
@@ -85,5 +77,4 @@ def main() -> None:
         _handle_integrator(summary_file, tpm_files)
 
 
-if __name__ == "__main__":
-    main()
+main()

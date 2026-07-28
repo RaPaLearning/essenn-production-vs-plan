@@ -29,7 +29,6 @@ class _SilenceStderr(unittest.TestCase):
 
 
 class TestApp(_SilenceStderr):
-
     def test_app_loads_and_processes_file(self):
         """Test the Streamlit app logic from loading to file download using AppTest naturally."""
         # Initialize the app test pointing to our main app script
@@ -157,7 +156,7 @@ class TestIntegratorPage(_SilenceStderr):
     def test_integrator_page_loads(self) -> None:
         """The integrator page should load without errors."""
         at = AppTest.from_file(
-            "pages/1_Actuals_Integrator.py",
+            "actuals_integrator_page.py",
             default_timeout=30,
         )
         at.run()
@@ -167,7 +166,7 @@ class TestIntegratorPage(_SilenceStderr):
     def test_integrator_handles_invalid_tpm(self) -> None:
         """Uploading invalid TPM data should show an error."""
         at = AppTest.from_file(
-            "pages/1_Actuals_Integrator.py",
+            "actuals_integrator_page.py",
             default_timeout=30,
         )
         at.run()
@@ -197,7 +196,7 @@ class TestIntegratorPage(_SilenceStderr):
     def test_integrator_success(self) -> None:
         """Valid summary + valid TPM should show download button."""
         at = AppTest.from_file(
-            "pages/1_Actuals_Integrator.py",
+            "actuals_integrator_page.py",
             default_timeout=30,
         )
         at.run()
@@ -247,11 +246,3 @@ class TestIntegratorPage(_SilenceStderr):
             getattr(e, "type", type(e).__name__) == "download_button" for e in at.main
         )
         self.assertTrue(has_download)
-
-    def test_integrator_page_back_button(self) -> None:
-        at = AppTest.from_file("pages/1_Actuals_Integrator.py", default_timeout=30)
-        at.run()
-        back_button = next(b for b in at.button if "Back to Home" in b.label)
-        back_button.click().run()
-        self.assertTrue(at.exception)
-        self.assertIn("Could not find page", str(at.exception[0]))

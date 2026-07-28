@@ -41,12 +41,8 @@ def _process_upload(
         return output_path.read_bytes()
 
 
-def main() -> None:
-    st.set_page_config(
-        page_title="Operations Extractor",
-        page_icon="📊",
-    )
-
+def _extractor_page() -> None:
+    """Render the Operations Extractor page."""
     st.title("📊 Operations Extractor")
     st.write("Upload your XLSX file to extract and summarize operations by date")
 
@@ -116,6 +112,19 @@ def _handle_upload(
     ]
     preview_df = preview_df.reset_index(drop=True)
     st.dataframe(preview_df, width="stretch")
+
+
+def main() -> None:
+    pages = [
+        st.Page(_extractor_page, title="Operations Extractor", icon="📊"),
+        st.Page(
+            "actuals_integrator_page.py",
+            title="Actuals Integrator",
+            icon="🔗",
+        ),
+    ]
+    nav = st.navigation(pages)
+    nav.run()
 
 
 if __name__ == "__main__":
