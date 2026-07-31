@@ -1,14 +1,20 @@
+import io
 import logging
 import os
 import unittest
 from datetime import date
+
+import openpyxl
+import pandas as pd
 from streamlit.testing.v1 import AppTest
 
 # Suppress all Streamlit stderr noise (logging + raw pyarrow tracebacks).
 logging.getLogger("streamlit").setLevel(logging.ERROR)
 
 
-class TestApp(unittest.TestCase):
+class _SilenceStderr(unittest.TestCase):
+    """Shared base that redirects stderr to devnull during tests."""
+
     def setUp(self) -> None:
         """Redirect the OS-level stderr fd to devnull to silence pyarrow tracebacks."""
         self._orig_stderr_fd = os.dup(2)
@@ -21,6 +27,8 @@ class TestApp(unittest.TestCase):
         os.close(self._orig_stderr_fd)
         os.close(self._devnull_fd)
 
+
+class TestApp(_SilenceStderr):
     def test_app_loads_and_processes_file(self):
         """Test the Streamlit app logic from loading to file download using AppTest naturally."""
         # Initialize the app test pointing to our main app script
@@ -140,3 +148,101 @@ class TestApp(unittest.TestCase):
             "Sundays are not working days",
             at.error[0].value,
         )
+
+
+class TestIntegratorPage(_SilenceStderr):
+    """Tests for the Actuals Integrator page."""
+
+    def test_integrator_page_loads(self) -> None:
+        """The integrator page should load without errors."""
+        at = AppTest.from_file(
+            "actuals_integrator_page.py",
+            default_timeout=30,
+        )
+        at.run()
+        self.assertFalse(at.exception, f"Page crashed: {at.exception}")
+        self.assertEqual(at.title[0].value, "🔗 Actuals Integrator")
+
+    def test_integrator_handles_invalid_tpm(self) -> None:
+        """Uploading invalid TPM data should show an error."""
+        at = AppTest.from_file(
+            "actuals_integrator_page.py",
+            default_timeout=30,
+        )
+        at.run()
+
+        # Minimal valid summary
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Shift A"  # type: ignore[union-attr]
+        ws["C1"] = "11-05-2026"  # type: ignore[index]
+        out = io.BytesIO()
+        wb.save(out)
+
+        mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+        at.file_uploader("integrator_summary").set_value(
+            [("summary.xlsx", out.getvalue(), mime)],
+        ).run()
+
+        at.file_uploader("integrator_tpm").set_value(
+            [("bad.xlsx", b"not excel", mime)],
+        ).run()
+
+        self.assertFalse(at.exception, f"App crashed: {at.exception}")
+        self.assertGreater(len(at.error), 0)
+        self.assertIn("Error integrating", at.error[0].value)
+
+    def test_integrator_success(self) -> None:
+        """Valid summary + valid TPM should show download button."""
+        at = AppTest.from_file(
+            "actuals_integrator_page.py",
+            default_timeout=30,
+        )
+        at.run()
+
+        # Build a minimal summary with a data row
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Shift A"  # type: ignore[union-attr]
+        ws["C1"] = "11-05-2026"  # type: ignore[index]
+        ws.cell(row=8, column=2).value = "ACE COLT"  # type: ignore[union-attr]
+        ws.cell(row=8, column=5).value = "766 0012 00 00 001"  # type: ignore[union-attr]
+        ws.cell(row=8, column=7).value = "10"  # type: ignore[union-attr]
+        s_out = io.BytesIO()
+        wb.save(s_out)
+
+        # Build a valid TPM file
+        tpm_out = io.BytesIO()
+        with pd.ExcelWriter(tpm_out, engine="openpyxl") as writer:
+            blank = pd.DataFrame([[""] * 5] * 6)
+            blank.to_excel(writer, index=False, header=False, startrow=0)  # type: ignore[reportUnknownMemberType]
+            tpm_df = pd.DataFrame(
+                {
+                    "SHIFT": ["Shift A"],
+                    "DATE": ["11/05/2026"],
+                    "MACHINE": ["ACE COLT"],
+                    "COMPONENT": ["766 0012 00 00 001"],
+                    "OPN NO.": ["10"],
+                    "ACTUAL": [119],
+                },
+            )
+            tpm_df.to_excel(writer, index=False, header=True, startrow=6)  # type: ignore[reportUnknownMemberType]
+
+        mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+        at.file_uploader("integrator_summary").set_value(
+            [("summary.xlsx", s_out.getvalue(), mime)],
+        ).run()
+
+        at.file_uploader("integrator_tpm").set_value(
+            [("tpm.xlsx", tpm_out.getvalue(), mime)],
+        ).run()
+
+        self.assertFalse(at.exception, f"App crashed: {at.exception}")
+
+        self.assertGreater(len(at.success), 0)
+        has_download = any(
+            getattr(e, "type", type(e).__name__) == "download_button" for e in at.main
+        )
+        self.assertTrue(has_download)
