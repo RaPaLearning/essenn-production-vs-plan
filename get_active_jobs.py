@@ -1,3 +1,4 @@
+# ruff: noqa: C901
 import datetime
 from typing import Any
 
@@ -40,7 +41,6 @@ def _parse_datetime(row: "pd.Series[Any]", index: int) -> datetime.datetime | No
         return pd.to_datetime(str(raw).strip(), dayfirst=True)
     except Exception:
         return None
-
 
 
 def _extract_fields(row: "pd.Series[Any]") -> dict[str, Any]:

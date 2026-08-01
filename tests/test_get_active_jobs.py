@@ -8,7 +8,6 @@ import pandas as pd
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from unittest.mock import MagicMock, patch
 
 from get_active_jobs import _parse_datetime, _safe_str  # type: ignore[reportPrivateUsage]
 from write_active_jobs import export_active_jobs
@@ -110,4 +109,5 @@ class TestGetActiveJobs(unittest.TestCase):
     def test_safe_str_returns_empty_on_nan(self) -> None:
         """Cover the pd.isna branch in _safe_str."""
         import numpy as np
+
         self.assertEqual(_safe_str(np.nan), "")
