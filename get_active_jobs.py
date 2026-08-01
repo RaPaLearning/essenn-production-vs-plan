@@ -42,16 +42,6 @@ def _parse_datetime(row: "pd.Series[Any]", index: int) -> datetime.datetime | No
         return None
 
 
-def _is_row_active(row: "pd.Series[Any]", target: datetime.date) -> bool:
-    """Check if a row has a valid order and its date range covers the target."""
-    if pd.isna(row.iloc[0]):  # type: ignore[arg-type]
-        return False
-    start = _parse_date(row, 8)
-    end = _parse_date(row, 10)
-    if start is None or end is None:
-        return False
-    return start <= target <= end
-
 
 def _extract_fields(row: "pd.Series[Any]") -> dict[str, Any]:
     """Extract and parse all relevant fields from a validated row."""
@@ -151,25 +141,6 @@ def _compute_and_build(
     return records, anomalies
 
 
-def _process_row(
-    row: "pd.Series[Any]",
-    target: datetime.date,
-    cycle_lookup: CycleTimeLookup | None = None,
-    machine_type: MachineType = "turning",
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Process a validated, in-range row. Returns (records, anomalies)."""
-    fields = _extract_fields(row)
-
-    if fields["start_dt"] is None or fields["end_dt"] is None:
-        return [], []
-
-    cycle_result = _resolve_cycle_time(cycle_lookup, fields["part_no"], fields["op_name"])
-    if cycle_result is None:
-        return [], _make_lookup_anomalies(fields, machine_type)
-
-    return _compute_and_build(fields, target, cycle_result, machine_type)
-
-
 def _process_sheet(
     df: pd.DataFrame,
     target: datetime.date,
@@ -180,20 +151,57 @@ def _process_sheet(
     if df.shape[0] < 6:
         return [], []
 
-    all_records: list[dict[str, Any]] = []
-    all_anomalies: list[dict[str, Any]] = []
+    valid_jobs: list[tuple[dict[str, Any], datetime.date, datetime.date, MachineType]] = []
     for _, row in df.iloc[5:].iterrows():
-        if not _is_row_active(row, target):
+        if pd.isna(row.iloc[0]):  # type: ignore[arg-type]
             continue
-        machine = _safe_str(row.iloc[7])
+        start = _parse_date(row, 8)
+        end = _parse_date(row, 10)
+        if start is None or end is None:
+            continue
+
+        fields = _extract_fields(row)
+        machine = fields["machine"]
         m_type: MachineType = (
             get_machine_type(machine_type_lookup, machine)
             if machine_type_lookup is not None
             else "turning"
         )
-        records, anomalies = _process_row(row, target, cycle_lookup, m_type)
+        valid_jobs.append((fields, start, end, m_type))
+
+    valid_jobs.sort(key=lambda x: (x[0]["machine"], x[0]["start_dt"] or datetime.datetime.min))
+
+    all_records: list[dict[str, Any]] = []
+    all_anomalies: list[dict[str, Any]] = []
+
+    prev_machine = None
+    prev_part_no = None
+
+    for fields, start, end, m_type in valid_jobs:
+        machine = fields["machine"]
+        part_no = fields["part_no"]
+
+        same_as_prev = (machine == prev_machine) and (part_no == prev_part_no)
+
+        prev_machine = machine
+        prev_part_no = part_no
+
+        if not (start <= target <= end):
+            continue
+
+        cycle_result = _resolve_cycle_time(cycle_lookup, part_no, fields["op_name"])
+        if cycle_result is None:
+            all_anomalies.extend(_make_lookup_anomalies(fields, m_type))
+            continue
+
+        setup_mins, cycle_mins = cycle_result
+        if same_as_prev:
+            setup_mins = 0.0
+
+        records, anomalies = _compute_and_build(fields, target, (setup_mins, cycle_mins), m_type)
         all_records.extend(records)
         all_anomalies.extend(anomalies)
+
     return all_records, all_anomalies
 
 
