@@ -1,5 +1,5 @@
 import datetime
-from typing import Any
+from typing import Any, NamedTuple
 
 import pandas as pd
 
@@ -12,8 +12,14 @@ from setup_cycle_times import (
     get_machine_type,
 )
 
-# Type alias for a validated job tuple.
-_ValidJob = tuple[dict[str, Any], datetime.date, datetime.date, MachineType]
+
+class _ValidJob(NamedTuple):
+    """A validated job extracted from a sheet row."""
+
+    fields: dict[str, Any]
+    start: datetime.date
+    end: datetime.date
+    machine_type: MachineType
 
 
 def _safe_str(val: object) -> str:
@@ -163,7 +169,7 @@ def _collect_valid_jobs(
             if machine_type_lookup is not None
             else "turning"
         )
-        valid_jobs.append((fields, start, end, m_type))
+        valid_jobs.append(_ValidJob(fields, start, end, m_type))
     return valid_jobs
 
 
@@ -202,23 +208,27 @@ def _process_sheet(
         return [], []
 
     valid_jobs = _collect_valid_jobs(df, machine_type_lookup)
-    valid_jobs.sort(key=lambda x: (x[0]["machine"], x[0]["start_dt"] or datetime.datetime.min))
+    valid_jobs.sort(
+        key=lambda job: (job.fields["machine"], job.fields["start_dt"] or datetime.datetime.min),
+    )
 
     all_records: list[dict[str, Any]] = []
     all_anomalies: list[dict[str, Any]] = []
     prev_machine = None
     prev_part_no = None
 
-    for fields, start, end, m_type in valid_jobs:
-        same_as_prev = (fields["machine"] == prev_machine) and (fields["part_no"] == prev_part_no)
-        prev_machine = fields["machine"]
-        prev_part_no = fields["part_no"]
+    for job in valid_jobs:
+        same_as_prev = (job.fields["machine"] == prev_machine) and (
+            job.fields["part_no"] == prev_part_no
+        )
+        prev_machine = job.fields["machine"]
+        prev_part_no = job.fields["part_no"]
 
         records, anomalies = _process_valid_job(
-            fields,
-            start,
-            end,
-            m_type,
+            job.fields,
+            job.start,
+            job.end,
+            job.machine_type,
             target,
             same_as_prev,
             cycle_lookup,
