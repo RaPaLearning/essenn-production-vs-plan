@@ -1,5 +1,5 @@
 import datetime
-from typing import Any
+from typing import Any, NamedTuple
 
 import pandas as pd
 
@@ -11,6 +11,15 @@ from setup_cycle_times import (
     get_cycle_minutes,
     get_machine_type,
 )
+
+
+class _ValidJob(NamedTuple):
+    """A validated job extracted from a sheet row."""
+
+    fields: dict[str, Any]
+    start: datetime.date
+    end: datetime.date
+    machine_type: MachineType
 
 
 def _safe_str(val: object) -> str:
@@ -40,17 +49,6 @@ def _parse_datetime(row: "pd.Series[Any]", index: int) -> datetime.datetime | No
         return pd.to_datetime(str(raw).strip(), dayfirst=True)
     except Exception:
         return None
-
-
-def _is_row_active(row: "pd.Series[Any]", target: datetime.date) -> bool:
-    """Check if a row has a valid order and its date range covers the target."""
-    if pd.isna(row.iloc[0]):  # type: ignore[arg-type]
-        return False
-    start = _parse_date(row, 8)
-    end = _parse_date(row, 10)
-    if start is None or end is None:
-        return False
-    return start <= target <= end
 
 
 def _extract_fields(row: "pd.Series[Any]") -> dict[str, Any]:
@@ -151,23 +149,52 @@ def _compute_and_build(
     return records, anomalies
 
 
-def _process_row(
-    row: "pd.Series[Any]",
-    target: datetime.date,
-    cycle_lookup: CycleTimeLookup | None = None,
-    machine_type: MachineType = "turning",
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Process a validated, in-range row. Returns (records, anomalies)."""
-    fields = _extract_fields(row)
+def _collect_valid_jobs(
+    df: pd.DataFrame,
+    machine_type_lookup: MachineTypeLookup | None,
+) -> list[_ValidJob]:
+    """Extract all valid jobs from a sheet's data rows."""
+    valid_jobs: list[_ValidJob] = []
+    for _, row in df.iloc[5:].iterrows():
+        if pd.isna(row.iloc[0]):  # type: ignore[arg-type]
+            continue
+        start = _parse_date(row, 8)
+        end = _parse_date(row, 10)
+        if start is None or end is None:
+            continue
 
-    if fields["start_dt"] is None or fields["end_dt"] is None:
+        fields = _extract_fields(row)
+        m_type: MachineType = (
+            get_machine_type(machine_type_lookup, fields["machine"])
+            if machine_type_lookup is not None
+            else "turning"
+        )
+        valid_jobs.append(_ValidJob(fields, start, end, m_type))
+    return valid_jobs
+
+
+def _process_valid_job(
+    fields: dict[str, Any],
+    start: datetime.date,
+    end: datetime.date,
+    m_type: MachineType,
+    target: datetime.date,
+    same_as_prev: bool,
+    cycle_lookup: CycleTimeLookup | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Process a single valid job, returning records and anomalies."""
+    if not (start <= target <= end):
         return [], []
 
     cycle_result = _resolve_cycle_time(cycle_lookup, fields["part_no"], fields["op_name"])
     if cycle_result is None:
-        return [], _make_lookup_anomalies(fields, machine_type)
+        return [], _make_lookup_anomalies(fields, m_type)
 
-    return _compute_and_build(fields, target, cycle_result, machine_type)
+    setup_mins, cycle_mins = cycle_result
+    if same_as_prev:
+        setup_mins = 0.0
+
+    return _compute_and_build(fields, target, (setup_mins, cycle_mins), m_type)
 
 
 def _process_sheet(
@@ -180,20 +207,35 @@ def _process_sheet(
     if df.shape[0] < 6:
         return [], []
 
+    valid_jobs = _collect_valid_jobs(df, machine_type_lookup)
+    valid_jobs.sort(
+        key=lambda job: (job.fields["machine"], job.fields["start_dt"] or datetime.datetime.min),
+    )
+
     all_records: list[dict[str, Any]] = []
     all_anomalies: list[dict[str, Any]] = []
-    for _, row in df.iloc[5:].iterrows():
-        if not _is_row_active(row, target):
-            continue
-        machine = _safe_str(row.iloc[7])
-        m_type: MachineType = (
-            get_machine_type(machine_type_lookup, machine)
-            if machine_type_lookup is not None
-            else "turning"
+    prev_machine = None
+    prev_part_no = None
+
+    for job in valid_jobs:
+        same_as_prev = (job.fields["machine"] == prev_machine) and (
+            job.fields["part_no"] == prev_part_no
         )
-        records, anomalies = _process_row(row, target, cycle_lookup, m_type)
+        prev_machine = job.fields["machine"]
+        prev_part_no = job.fields["part_no"]
+
+        records, anomalies = _process_valid_job(
+            job.fields,
+            job.start,
+            job.end,
+            job.machine_type,
+            target,
+            same_as_prev,
+            cycle_lookup,
+        )
         all_records.extend(records)
         all_anomalies.extend(anomalies)
+
     return all_records, all_anomalies
 
 
