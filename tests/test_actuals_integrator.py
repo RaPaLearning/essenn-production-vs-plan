@@ -75,12 +75,11 @@ class TestActualsIntegrator(unittest.TestCase):
     def _get_default_tpm_data(self) -> dict[str, list[object]]:
         """Return a default TPM data dictionary for testing."""
         return {
-            "SHIFT": ["Shift A"],
-            "DATE": ["11/05/2026"],
-            "MACHINE": ["ACE COLT"],
-            "COMPONENT": ["766 0012 00 00 001"],
-            "OPN NO.": ["10"],
-            "ACTUAL": [119],
+            "SHIFT": ["I"],
+            "DATE": ["20260511"],
+            "MACHINE NO": ["ACE COLT"],
+            "JOB ORDER NO.": ["J-001"],
+            "ACP QTY": [119],
         }
 
     def _process_and_load(self, summary: bytes, tpm_files: list[bytes]) -> openpyxl.Workbook:
@@ -101,10 +100,9 @@ class TestActualsIntegrator(unittest.TestCase):
         data = self._get_default_tpm_data()
         data.update(
             {
-                "MACHINE": ["OTHER MACHINE"],
-                "COMPONENT": ["DIFFERENT-PART"],
-                "OPN NO.": ["20"],
-                "ACTUAL": [999],
+                "MACHINE NO": ["OTHER MACHINE"],
+                "JOB ORDER NO.": ["DIFFERENT-JOB"],
+                "ACP QTY": [999],
             }
         )
         tpm = self._create_tpm_bytes(data)
@@ -115,10 +113,10 @@ class TestActualsIntegrator(unittest.TestCase):
         """Actuals from multiple TPM files should be summed."""
         summary = self._create_summary_bytes()
         data1 = self._get_default_tpm_data()
-        data1["ACTUAL"] = [100]
+        data1["ACP QTY"] = [100]
         tpm1 = self._create_tpm_bytes(data1)
         data2 = self._get_default_tpm_data()
-        data2["ACTUAL"] = [50]
+        data2["ACP QTY"] = [50]
         tpm2 = self._create_tpm_bytes(data2)
         wb = self._process_and_load(summary, [tpm1, tpm2])
         self.assertEqual(wb["Shift A"].cell(row=8, column=9).value, 150)
@@ -133,8 +131,8 @@ class TestActualsIntegrator(unittest.TestCase):
         """TPM data for a different shift does not fill OK QTY."""
         summary = self._create_summary_bytes()
         data = self._get_default_tpm_data()
-        data["SHIFT"] = ["Shift C"]
-        data["ACTUAL"] = [100]
+        data["SHIFT"] = ["III"]
+        data["ACP QTY"] = [100]
         tpm = self._create_tpm_bytes(data)
         wb = self._process_and_load(summary, [tpm])
         self.assertIsNone(wb["Shift A"].cell(row=8, column=9).value)
@@ -143,7 +141,7 @@ class TestActualsIntegrator(unittest.TestCase):
         """Zero actual total does not fill OK QTY."""
         summary = self._create_summary_bytes()
         data = self._get_default_tpm_data()
-        data["ACTUAL"] = [0]
+        data["ACP QTY"] = [0]
         tpm = self._create_tpm_bytes(data)
         wb = self._process_and_load(summary, [tpm])
         self.assertIsNone(wb["Shift A"].cell(row=8, column=9).value)
@@ -152,12 +150,12 @@ class TestActualsIntegrator(unittest.TestCase):
         """Summary rows with no part number are skipped."""
         summary = self._create_summary_bytes()
         wb = openpyxl.load_workbook(io.BytesIO(summary))
-        wb["Shift A"].cell(row=8, column=5).value = None
+        wb["Shift A"].cell(row=8, column=3).value = None
         out = io.BytesIO()
         wb.save(out)
 
         data = self._get_default_tpm_data()
-        data["ACTUAL"] = [100]
+        data["ACP QTY"] = [100]
         tpm = self._create_tpm_bytes(data)
         wb2 = self._process_and_load(out.getvalue(), [tpm])
         self.assertIsNone(wb2["Shift A"].cell(row=8, column=9).value)
@@ -165,7 +163,7 @@ class TestActualsIntegrator(unittest.TestCase):
     def test_missing_or_invalid_date_skips(self) -> None:
         """If date is missing or invalid in summary, the sheet is skipped."""
         data = self._get_default_tpm_data()
-        data["ACTUAL"] = [100]
+        data["ACP QTY"] = [100]
         tpm = self._create_tpm_bytes(data)
 
         # 1. Missing date
@@ -188,7 +186,7 @@ class TestActualsIntegrator(unittest.TestCase):
         """If TPM lacks SHIFT/MACHINE headers, it is skipped."""
         out = io.BytesIO()
         with pd.ExcelWriter(out, engine="openpyxl") as writer:
-            df = pd.DataFrame({"NOT_SHIFT": ["A"], "NOT_MACHINE": ["B"]})
+            df = pd.DataFrame({"NOT_SHIFT": ["A"], "NOT_JOB_ORDER": ["B"]})
             df.to_excel(writer, index=False, header=True, startrow=0)  # type: ignore[reportUnknownMemberType]
         tpm_no_headers = out.getvalue()
 

@@ -9,10 +9,10 @@ import pandas as pd
 
 
 def _find_header_row(raw: pd.DataFrame) -> int:
-    """Find the row index containing SHIFT and MACHINE headers."""
+    """Find the row index containing SHIFT and JOB ORDER NO. headers."""
     for idx, row in raw.iterrows():  # type: ignore[reportUnknownMemberType]
         vals = [str(v).upper().strip() for v in row if pd.notna(v)]
-        if "SHIFT" in vals and "MACHINE" in vals:
+        if "SHIFT" in vals and "JOB ORDER NO." in vals:
             return int(idx)  # type: ignore[reportUnknownArgumentType]
     return -1
 
@@ -37,7 +37,13 @@ def _parse_single_tpm(tpm_bytes: bytes) -> pd.DataFrame | None:
     )
     df.columns = [str(c).upper().strip() for c in df.columns]
 
-    return df.dropna(subset=["MACHINE"])
+    shift_map = {"I": "SHIFT A", "II": "SHIFT B", "III": "SHIFT C"}
+    if "SHIFT" in df.columns:
+        df["SHIFT"] = (
+            df["SHIFT"].astype(str).str.strip().str.upper().map(shift_map).fillna(df["SHIFT"])
+        )
+
+    return df.dropna(subset=["MACHINE NO"])
 
 
 def _parse_all_tpm(tpm_bytes_list: list[bytes]) -> pd.DataFrame:
@@ -54,9 +60,9 @@ def _parse_all_tpm(tpm_bytes_list: list[bytes]) -> pd.DataFrame:
 
     tpm_data: pd.DataFrame = pd.concat(tpm_dfs, ignore_index=True)
     tpm_data["DATE"] = pd.to_datetime(  # type: ignore[reportUnknownMemberType]
-        tpm_data["DATE"],
-        dayfirst=True,
-        format="mixed",
+        tpm_data["DATE"].astype(str),
+        format="%Y%m%d",
+        errors="coerce",
     ).dt.date
     return tpm_data
 
@@ -82,20 +88,6 @@ def norm_str(s: str) -> str:
     return str(s).replace("-", "").replace(" ", "").replace(".", "").upper()
 
 
-def _match_component(
-    matches: pd.DataFrame,
-    part_str: str,
-) -> pd.DataFrame:
-    """Filter TPM rows by bidirectional substring match on component."""
-    tpm_comps_norm = matches["COMPONENT"].astype(str).apply(norm_str)
-    mask = tpm_comps_norm.apply(
-        lambda tpm_c: (  # type: ignore[reportUnknownLambdaType]
-            tpm_c != "NAN" and tpm_c != "" and (part_str in tpm_c or tpm_c in part_str)
-        )
-    )
-    return matches[mask]
-
-
 def _fill_row_actual(
     ws: openpyxl.worksheet.worksheet.Worksheet,
     r_num: int,
@@ -103,20 +95,19 @@ def _fill_row_actual(
 ) -> None:
     """Fill OK QTY for a single summary row if TPM data matches."""
     m_str = norm_str(str(ws.cell(row=r_num, column=2).value or ""))
-    part_str = norm_str(str(ws.cell(row=r_num, column=5).value or ""))
+    job_order_str = norm_str(str(ws.cell(row=r_num, column=3).value or ""))
 
-    if not m_str or not part_str:
+    if not m_str or not job_order_str:
         return
 
-    # Filter by Machine (Normalized exact match)
-    tpm_machines_norm = shift_data["MACHINE"].astype(str).apply(norm_str)
-    matches = _match_component(
-        shift_data[tpm_machines_norm == m_str],
-        part_str,
-    )
+    # Filter by Machine and Job Order No (Normalized exact match)
+    tpm_machines_norm = shift_data["MACHINE NO"].astype(str).apply(norm_str)
+    tpm_jobs_norm = shift_data["JOB ORDER NO."].astype(str).apply(norm_str)
+
+    matches = shift_data[(tpm_machines_norm == m_str) & (tpm_jobs_norm == job_order_str)]
 
     if not matches.empty:
-        total_actual = int(pd.to_numeric(matches["ACTUAL"], errors="coerce").fillna(0).sum())
+        total_actual = int(pd.to_numeric(matches["ACP QTY"], errors="coerce").fillna(0).sum())
         if total_actual > 0:
             ws.cell(row=r_num, column=9).value = total_actual  # type: ignore[reportAttributeAccessIssue]
 
