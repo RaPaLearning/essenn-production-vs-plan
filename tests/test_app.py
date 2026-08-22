@@ -207,6 +207,7 @@ class TestIntegratorPage(_SilenceStderr):
         ws.title = "Shift A"  # type: ignore[union-attr]
         ws["C1"] = "11-05-2026"  # type: ignore[index]
         ws.cell(row=8, column=2).value = "ACE COLT"  # type: ignore[union-attr]
+        ws.cell(row=8, column=3).value = "J-001"  # type: ignore[union-attr]
         ws.cell(row=8, column=5).value = "766 0012 00 00 001"  # type: ignore[union-attr]
         ws.cell(row=8, column=7).value = "10"  # type: ignore[union-attr]
         s_out = io.BytesIO()
@@ -219,12 +220,11 @@ class TestIntegratorPage(_SilenceStderr):
             blank.to_excel(writer, index=False, header=False, startrow=0)  # type: ignore[reportUnknownMemberType]
             tpm_df = pd.DataFrame(
                 {
-                    "SHIFT": ["Shift A"],
-                    "DATE": ["11/05/2026"],
-                    "MACHINE": ["ACE COLT"],
-                    "COMPONENT": ["766 0012 00 00 001"],
-                    "OPN NO.": ["10"],
-                    "ACTUAL": [119],
+                    "SHIFT": ["I"],
+                    "DATE": ["20260511"],
+                    "MACHINE NO": ["ACE COLT"],
+                    "JOB ORDER NO.": ["J-001"],
+                    "ACP QTY": [119],
                 },
             )
             tpm_df.to_excel(writer, index=False, header=True, startrow=6)  # type: ignore[reportUnknownMemberType]
