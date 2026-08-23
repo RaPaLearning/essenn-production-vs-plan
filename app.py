@@ -17,6 +17,7 @@ MASTERLIST_PATH: str = str(
     / "factory_data"
     / "Mater list of Component(Preactor)-1 (1) (1).xls"
 )
+VERSION: str = "1.1"
 
 
 def _process_upload(
@@ -124,6 +125,7 @@ def main() -> None:
         ),
     ]
     nav = st.navigation(pages)
+    st.sidebar.caption(f"v{VERSION}")
     nav.run()
 
 

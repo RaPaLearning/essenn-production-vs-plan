@@ -1,6 +1,7 @@
 import io
 import logging
 import os
+import re
 import unittest
 from datetime import date
 
@@ -131,6 +132,17 @@ class TestApp(_SilenceStderr):
         )
         self.assertEqual(
             len(at.dataframe), 0, "Dataframe preview should not be rendered after a failure"
+        )
+
+    def test_sidebar_version_display(self) -> None:
+        """Test that a version number matching x.y is displayed in the sidebar."""
+        at = AppTest.from_file("app.py", default_timeout=30)
+        at.run()
+        self.assertFalse(at.exception, f"App failed to load: {at.exception}")
+        captions = [c.value for c in at.sidebar.caption]
+        self.assertTrue(
+            any(re.search(r"\d+\.\d+", cap) for cap in captions),
+            f"Version matching x.y not found in sidebar captions: {captions}",
         )
 
     def test_app_blocks_sunday(self):
