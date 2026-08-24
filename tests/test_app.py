@@ -97,6 +97,9 @@ class TestApp(_SilenceStderr):
         at = AppTest.from_file("app.py", default_timeout=30)
         at.run()
 
+        # Ensure we are not on a Sunday by setting a known Monday
+        at.date_input[0].set_value(date(2026, 3, 16)).run()
+
         # Uploading raw text bytes mapped to an excel mime to trigger pandas crash artificially
         bad_bytes = b"This is definitely not an excel file."
         mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
