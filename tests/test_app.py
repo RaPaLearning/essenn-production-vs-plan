@@ -4,36 +4,27 @@ import os
 import re
 import unittest
 from datetime import date
-
+from pathlib import Path
 import openpyxl
 import pandas as pd
 from streamlit.testing.v1 import AppTest
 
-# Suppress all Streamlit stderr noise (logging + raw pyarrow tracebacks).
-logging.getLogger("streamlit").setLevel(logging.ERROR)
+
+# Suppress all Streamlit warning logs.
+def _suppress_streamlit_warning(*_args: object, **_kwargs: object) -> None:
+    pass
 
 
-class _SilenceStderr(unittest.TestCase):
-    """Shared base that redirects stderr to devnull during tests."""
-
-    def setUp(self) -> None:
-        """Redirect the OS-level stderr fd to devnull to silence pyarrow tracebacks."""
-        self._orig_stderr_fd = os.dup(2)
-        self._devnull_fd = os.open(os.devnull, os.O_WRONLY)
-        os.dup2(self._devnull_fd, 2)
-
-    def tearDown(self) -> None:
-        """Restore the OS-level stderr fd after each test."""
-        os.dup2(self._orig_stderr_fd, 2)
-        os.close(self._orig_stderr_fd)
-        os.close(self._devnull_fd)
+logging.getLogger(
+    "streamlit.runtime.scriptrunner_utils.script_run_context"
+).warning = _suppress_streamlit_warning
 
 
-class TestApp(_SilenceStderr):
+class TestApp(unittest.TestCase):
     def test_app_loads_and_processes_file(self):
         """Test the Streamlit app logic from loading to file download using AppTest naturally."""
         # Initialize the app test pointing to our main app script
-        at = AppTest.from_file("app.py", default_timeout=30)
+        at = AppTest.from_file(str(Path(__file__).parent.parent / "app.py"), default_timeout=30)
         at.run()
 
         # Verify that the app loaded correctly without any immediate crashes
@@ -94,7 +85,7 @@ class TestApp(_SilenceStderr):
 
         This tests the except block to ensure there are no crashes in AppTest.
         """
-        at = AppTest.from_file("app.py", default_timeout=30)
+        at = AppTest.from_file(str(Path(__file__).parent.parent / "app.py"), default_timeout=30)
         at.run()
 
         # Ensure we are not on a Sunday by setting a known Monday
@@ -139,7 +130,7 @@ class TestApp(_SilenceStderr):
 
     def test_sidebar_version_display(self) -> None:
         """Test that a version number matching x.y is displayed in the sidebar."""
-        at = AppTest.from_file("app.py", default_timeout=30)
+        at = AppTest.from_file(str(Path(__file__).parent.parent / "app.py"), default_timeout=30)
         at.run()
         self.assertFalse(at.exception, f"App failed to load: {at.exception}")
         captions = [c.value for c in at.sidebar.caption]
@@ -150,7 +141,7 @@ class TestApp(_SilenceStderr):
 
     def test_app_blocks_sunday(self):
         """Selecting a Sunday should show an error and stop the app."""
-        at = AppTest.from_file("app.py", default_timeout=30)
+        at = AppTest.from_file(str(Path(__file__).parent.parent / "app.py"), default_timeout=30)
         at.run()
 
         # Set date to a Sunday (July 5, 2026 is a Sunday)
@@ -165,13 +156,13 @@ class TestApp(_SilenceStderr):
         )
 
 
-class TestIntegratorPage(_SilenceStderr):
+class TestIntegratorPage(unittest.TestCase):
     """Tests for the Actuals Integrator page."""
 
     def test_integrator_page_loads(self) -> None:
         """The integrator page should load without errors."""
         at = AppTest.from_file(
-            "actuals_integrator_page.py",
+            str(Path(__file__).parent.parent / "actuals_integrator_page.py"),
             default_timeout=30,
         )
         at.run()
@@ -181,7 +172,7 @@ class TestIntegratorPage(_SilenceStderr):
     def test_integrator_handles_invalid_tpm(self) -> None:
         """Uploading invalid TPM data should show an error."""
         at = AppTest.from_file(
-            "actuals_integrator_page.py",
+            str(Path(__file__).parent.parent / "actuals_integrator_page.py"),
             default_timeout=30,
         )
         at.run()
@@ -211,7 +202,7 @@ class TestIntegratorPage(_SilenceStderr):
     def test_integrator_success(self) -> None:
         """Valid summary + valid TPM should show download button."""
         at = AppTest.from_file(
-            "actuals_integrator_page.py",
+            str(Path(__file__).parent.parent / "actuals_integrator_page.py"),
             default_timeout=30,
         )
         at.run()
