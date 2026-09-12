@@ -28,9 +28,7 @@ class TestWriteActiveJobs(unittest.TestCase):
         mock_wb_instance = MagicMock()
         mock_wb.return_value = mock_wb_instance
 
-        export_active_jobs(
-            "dummy.xlsx", "2026-09-12", "master.xlsx", "machine.xlsx"
-        )
+        export_active_jobs("dummy.xlsx", "2026-09-12", "master.xlsx", "machine.xlsx")
 
         mock_wb.assert_called_once()  # type: ignore[reportUnknownMemberType]
 
@@ -51,8 +49,6 @@ class TestWriteActiveJobs(unittest.TestCase):
         mock_wb_instance = MagicMock()
         mock_wb.return_value = mock_wb_instance
 
-        export_active_jobs(
-            "dummy.xlsx", "2026-09-12", "master.xlsx", "machine.xlsx"
-        )
+        export_active_jobs("dummy.xlsx", "2026-09-12", "master.xlsx", "machine.xlsx")
 
         mock_wb.assert_called_once()  # type: ignore[reportUnknownMemberType]

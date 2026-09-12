@@ -31,7 +31,8 @@ def upload_masterlist(file_path: str) -> int:
     # Columns: PART NO., PART NAME, OPN NO., OPERATION NAME,
     #          RESOURCE, CT \nSEC, MACHINE TYPE
     all_data: list[dict[str, str | float | None]] = [
-        _build_row(row) for _, row in df.iterrows()  # type: ignore[reportUnknownArgumentType]
+        _build_row(row)
+        for _, row in df.iterrows()  # type: ignore[reportUnknownArgumentType]
     ]
 
     print(f"Uploading {len(all_data)} rows to Supabase...")

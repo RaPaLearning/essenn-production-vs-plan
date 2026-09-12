@@ -93,20 +93,21 @@ class TestUploadMasterlist(unittest.TestCase):
             }
         )
 
+    def _setup_mock_supabase_insert(self, mock_sb: Any, return_data: Any) -> None:
+        mock_res = MagicMock()
+        mock_res.data = return_data
+        mock_sb.table().insert().execute.return_value = mock_res  # type: ignore[reportUnknownMemberType]
+
     @patch("db.upload_masterlist.supabase")
     @patch("pandas.read_excel")
     def test_upload_masterlist(self, mock_read_excel: Any, mock_supabase: Any) -> None:
         mock_read_excel.return_value = self._create_mock_df()
-        mock_res = MagicMock()
-        mock_res.data = [1]
-        mock_supabase.table().insert().execute.return_value = mock_res  # type: ignore[reportUnknownMemberType]
-        uploaded = upload_masterlist("fake.xlsx")
-        self.assertEqual(uploaded, 1)
+        self._setup_mock_supabase_insert(mock_supabase, [1])
+        self.assertEqual(upload_masterlist("fake.xlsx"), 1)
 
     @patch("db.upload_masterlist.supabase", None)
     def test_upload_no_client(self) -> None:
-        result = upload_masterlist("fake.xlsx")
-        self.assertEqual(result, 0)
+        self.assertEqual(upload_masterlist("fake.xlsx"), 0)
 
     @patch("db.upload_masterlist.supabase")
     @patch("pandas.read_excel")
@@ -114,19 +115,15 @@ class TestUploadMasterlist(unittest.TestCase):
         import numpy as np
 
         mock_read_excel.return_value = self._create_mock_df(np.nan)
-        mock_res = MagicMock()
-        mock_res.data = [1]
-        mock_supabase.table().insert().execute.return_value = mock_res  # type: ignore[reportUnknownMemberType]
-        uploaded = upload_masterlist("fake.xlsx")
-        self.assertEqual(uploaded, 1)
+        self._setup_mock_supabase_insert(mock_supabase, [{"id": 1}])
+        self.assertEqual(upload_masterlist("nan_ct.xlsx"), 1)
 
     @patch("db.upload_masterlist.supabase")
     @patch("pandas.read_excel")
     def test_upload_insert_error(self, mock_read_excel: Any, mock_supabase: Any) -> None:
         mock_read_excel.return_value = self._create_mock_df(10.0)
         mock_supabase.table().insert().execute.side_effect = Exception("db error")  # type: ignore[reportUnknownMemberType]
-        result = upload_masterlist("fake.xlsx")
-        self.assertEqual(result, 0)
+        self.assertEqual(upload_masterlist("fake.xlsx"), 0)
 
     @patch("pandas.read_excel")
     @patch("db.upload_masterlist.supabase")
@@ -154,38 +151,26 @@ class TestRunMigrations(unittest.TestCase):
             with patch.dict(os.environ, {}, clear=True):
                 run_migrations.run_migrations()
 
-    def test_success(self) -> None:
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
+    def _run_with_mock_http(self, post_side_effect: Any) -> None:
         with patch.object(run_migrations, "supabase", MagicMock()):
             with patch.dict(
                 os.environ,
                 {"SUPABASE_URL": "http://test", "SUPABASE_KEY": "key"},
             ):
-                with patch.object(run_migrations.httpx, "post", return_value=mock_resp):
+                with patch.object(run_migrations.httpx, "post", side_effect=post_side_effect):
                     run_migrations.run_migrations()
+
+    def test_success(self) -> None:
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        self._run_with_mock_http([mock_resp, mock_resp])
 
     def test_fallback(self) -> None:
         mock_resp_fail = MagicMock()
         mock_resp_fail.status_code = 404
         mock_resp_ok = MagicMock()
         mock_resp_ok.status_code = 200
-        with patch.object(run_migrations, "supabase", MagicMock()):
-            with patch.dict(
-                os.environ,
-                {"SUPABASE_URL": "http://test", "SUPABASE_KEY": "key"},
-            ):
-                with patch.object(
-                    run_migrations.httpx,
-                    "post",
-                    side_effect=[
-                        mock_resp_fail,
-                        mock_resp_ok,
-                        mock_resp_fail,
-                        mock_resp_ok,
-                    ],
-                ):
-                    run_migrations.run_migrations()
+        self._run_with_mock_http([mock_resp_fail, mock_resp_ok, mock_resp_fail, mock_resp_ok])
 
     @patch("httpx.post")
     def test_main_cli(self, mock_httpx_post: Any) -> None:
