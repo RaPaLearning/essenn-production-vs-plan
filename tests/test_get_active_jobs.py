@@ -92,7 +92,7 @@ class TestGetActiveJobs(unittest.TestCase):
         finally:
             os.remove(active_jobs_path)
 
-    # --- _parse_datetime branch coverage (no pragma: no cover) ---
+    # --- _parse_datetime branch coverage ---
 
     def test_parse_datetime_returns_none_for_nan(self) -> None:
         """Cover the pd.isna branch in _parse_datetime."""
