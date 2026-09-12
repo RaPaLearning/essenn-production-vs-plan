@@ -206,3 +206,30 @@ class TestDbClient(unittest.TestCase):
             if saved_key is not None:
                 os.environ["SUPABASE_KEY"] = saved_key
             importlib.reload(db.client)
+
+    def test_client_created_with_env(self) -> None:
+        """When SUPABASE_URL/KEY are set, create_client should be called."""
+        import importlib
+
+        import db.client
+
+        saved_url = os.environ.get("SUPABASE_URL")
+        saved_key = os.environ.get("SUPABASE_KEY")
+        try:
+            os.environ["SUPABASE_URL"] = "https://fake.supabase.co"
+            os.environ["SUPABASE_KEY"] = "fake-key"
+            mock_client = MagicMock()
+            with (
+                patch("dotenv.load_dotenv"),
+                patch("supabase.create_client", return_value=mock_client),
+            ):
+                importlib.reload(db.client)
+                self.assertEqual(db.client.supabase, mock_client)
+        finally:
+            os.environ.pop("SUPABASE_URL", None)
+            os.environ.pop("SUPABASE_KEY", None)
+            if saved_url is not None:
+                os.environ["SUPABASE_URL"] = saved_url
+            if saved_key is not None:
+                os.environ["SUPABASE_KEY"] = saved_key
+            importlib.reload(db.client)
