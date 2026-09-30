@@ -34,4 +34,7 @@ jobs:
           npm install --no-save jscpd
 
       - name: Run guard-my-code.sh
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: uv run bash ./guard-my-code.sh

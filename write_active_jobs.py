@@ -414,6 +414,13 @@ def export_active_jobs(
         machine_type_lookup,
     )
 
+    try:
+        from db.save_summaries import save_report_summaries  # type: ignore[reportUnknownVariableType]
+
+        save_report_summaries(date_str, rows, anomalies)  # type: ignore[reportUnknownVariableType]
+    except Exception as e:
+        print(f"Failed to save summaries to Supabase: {e}")
+
     # Save workbook with exactly the three shift sheets
     wb = openpyxl.Workbook()
 
