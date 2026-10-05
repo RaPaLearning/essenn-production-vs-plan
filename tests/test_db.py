@@ -177,12 +177,12 @@ class TestTablesExist(unittest.TestCase):
     """Verify that the expected tables exist in the test database."""
 
     def test_masterlist_table_exists(self) -> None:
-        assert _test_client is not None
+        if _test_client is None: raise RuntimeError("Client not initialized")
         res = _test_client.table("masterlist").select("*").limit(1).execute()
         self.assertIsInstance(res.data, list)
 
     def test_summaries_table_exists(self) -> None:
-        assert _test_client is not None
+        if _test_client is None: raise RuntimeError("Client not initialized")
         res = _test_client.table("summaries").select("*").limit(1).execute()
         self.assertIsInstance(res.data, list)
 
@@ -192,11 +192,11 @@ class TestUploadMasterlistIntegration(unittest.TestCase):
     """Test uploading masterlist data to a real database."""
 
     def setUp(self) -> None:
-        assert _test_client is not None
+        if _test_client is None: raise RuntimeError("Client not initialized")
         _wipe_table(_test_client, "masterlist")
 
     def test_upload_inserts_real_data(self) -> None:
-        assert _test_client is not None
+        if _test_client is None: raise RuntimeError("Client not initialized")
         # Point the module's client at our test database
         with patch("db.upload_masterlist.supabase", _test_client):
             import pandas as pd
@@ -225,7 +225,7 @@ class TestUploadMasterlistIntegration(unittest.TestCase):
 
     def test_upload_replaces_old_data(self) -> None:
         """Uploading again should wipe old rows (handles deleted Excel rows)."""
-        assert _test_client is not None
+        if _test_client is None: raise RuntimeError("Client not initialized")
         import pandas as pd
 
         df1 = pd.DataFrame(
@@ -260,11 +260,17 @@ class TestSaveSummariesIntegration(unittest.TestCase):
     """Test saving summaries to a real database."""
 
     def setUp(self) -> None:
-        assert _test_client is not None
+        if _test_client is None: raise RuntimeError("Client not initialized")
         _wipe_table(_test_client, "summaries")
 
+    def _save_and_fetch(self, rows: list[dict[str, str]]) -> list[dict[str, Any]]:
+        if _test_client is None: raise RuntimeError("Client not initialized")
+        with patch("db.save_summaries.supabase", _test_client):
+            save_report_summaries("2026-10-04", rows, [])
+        return _test_client.table("summaries").select("*").execute().data
+
     def test_save_inserts_real_data(self) -> None:
-        assert _test_client is not None
+        if _test_client is None: raise RuntimeError("Client not initialized")
         rows: list[dict[str, str]] = [
             {
                 "Shift": "Shift A",
@@ -278,17 +284,14 @@ class TestSaveSummariesIntegration(unittest.TestCase):
                 "OK QTY": "40",
             }
         ]
-        with patch("db.save_summaries.supabase", _test_client):
-            save_report_summaries("2026-10-04", rows, [])
-
-        res = _test_client.table("summaries").select("*").execute()
-        self.assertEqual(len(res.data), 1)
-        self.assertEqual(res.data[0]["shift"], "Shift A")
-        self.assertEqual(res.data[0]["machine"], "M1")
-        self.assertEqual(res.data[0]["ok_qty"], 40)
+        data = self._save_and_fetch(rows)
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["shift"], "Shift A")
+        self.assertEqual(data[0]["machine"], "M1")
+        self.assertEqual(data[0]["ok_qty"], 40)
 
     def test_save_non_digit_fields(self) -> None:
-        assert _test_client is not None
+        if _test_client is None: raise RuntimeError("Client not initialized")
         rows: list[dict[str, str]] = [
             {
                 "Shift": "A",
@@ -302,13 +305,10 @@ class TestSaveSummariesIntegration(unittest.TestCase):
                 "OK QTY": "nope",
             }
         ]
-        with patch("db.save_summaries.supabase", _test_client):
-            save_report_summaries("2026-10-04", rows, [])
-
-        res = _test_client.table("summaries").select("*").execute()
-        self.assertEqual(len(res.data), 1)
-        self.assertIsNone(res.data[0]["total_qty"])
-        self.assertIsNone(res.data[0]["ok_qty"])
+        data = self._save_and_fetch(rows)
+        self.assertEqual(len(data), 1)
+        self.assertIsNone(data[0]["total_qty"])
+        self.assertIsNone(data[0]["ok_qty"])
 
 
 @unittest.skipUnless(_test_client, _skip_reason)
@@ -316,11 +316,11 @@ class TestGetMasterlistIntegration(unittest.TestCase):
     """Test retrieving masterlist from a real database."""
 
     def setUp(self) -> None:
-        assert _test_client is not None
+        if _test_client is None: raise RuntimeError("Client not initialized")
         _wipe_table(_test_client, "masterlist")
 
     def test_get_returns_data(self) -> None:
-        assert _test_client is not None
+        if _test_client is None: raise RuntimeError("Client not initialized")
         # Insert a row directly
         _test_client.table("masterlist").insert(
             {
@@ -341,7 +341,7 @@ class TestGetMasterlistIntegration(unittest.TestCase):
         self.assertEqual(df.iloc[0]["part_no"], "P1")
 
     def test_get_empty_table(self) -> None:
-        assert _test_client is not None
+        if _test_client is None: raise RuntimeError("Client not initialized")
         with patch("db.get_masterlist.supabase", _test_client):
             df = get_masterlist()
         self.assertEqual(len(df), 0)

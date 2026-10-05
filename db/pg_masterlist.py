@@ -130,12 +130,15 @@ def create_rows(conn: psycopg.Connection[Any], rows: list[Row], replace: bool = 
 
     Runs in a single transaction, so if the insert fails the old data is kept.
     """
-    cols = ", ".join(_COLUMNS)
-    placeholders = ", ".join(f"%({c})s" for c in _COLUMNS)
+    from psycopg.sql import SQL, Identifier, Placeholder
+    cols_sql = SQL(", ").join(map(Identifier, _COLUMNS))
+    placeholders_sql = SQL(", ").join(Placeholder(c) for c in _COLUMNS)
+    query = SQL("INSERT INTO public.masterlist ({}) VALUES ({})").format(cols_sql, placeholders_sql)
+    
     with conn.transaction(), conn.cursor() as cur:
         if replace:
             cur.execute("DELETE FROM public.masterlist")
-        cur.executemany(f"INSERT INTO public.masterlist ({cols}) VALUES ({placeholders})", rows)
+        cur.executemany(query, rows)
     return len(rows)
 
 
@@ -143,17 +146,20 @@ def read_rows(
     conn: psycopg.Connection[Any], part_no: str | None = None, limit: int | None = None
 ) -> list[Row]:
     """READ: fetch rows, optionally filtered by part_no."""
-    sql = f"SELECT id, {', '.join(_COLUMNS)} FROM public.masterlist"
+    from psycopg.sql import SQL, Identifier
+    cols_sql = SQL(", ").join(map(Identifier, _COLUMNS))
+    query = SQL("SELECT id, {} FROM public.masterlist").format(cols_sql)
+    
     params: list[Any] = []
     if part_no is not None:
-        sql += " WHERE part_no = %s"
+        query += SQL(" WHERE part_no = %s")
         params.append(part_no)
-    sql += " ORDER BY id"
+    query += SQL(" ORDER BY id")
     if limit is not None:
-        sql += " LIMIT %s"
+        query += SQL(" LIMIT %s")
         params.append(limit)
     with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
-        cur.execute(sql, params)  # type: ignore[arg-type]
+        cur.execute(query, params)
         return list(cur.fetchall())
 
 
@@ -172,12 +178,13 @@ def update_row(conn: psycopg.Connection[Any], row_id: int, **fields: Any) -> int
         raise ValueError(f"Unknown columns: {sorted(bad)}")
     if not fields:
         return 0
-    assignments = ", ".join(f"{c} = %({c})s" for c in fields)
+    from psycopg.sql import SQL, Identifier, Placeholder
+    assignments = SQL(", ").join(
+        SQL("{} = {}").format(Identifier(c), Placeholder(c)) for c in fields
+    )
+    query = SQL("UPDATE public.masterlist SET {} WHERE id = %(id)s").format(assignments)
     with conn.transaction(), conn.cursor() as cur:
-        cur.execute(
-            f"UPDATE public.masterlist SET {assignments} WHERE id = %(id)s",  # type: ignore[arg-type]
-            {**fields, "id": row_id},
-        )
+        cur.execute(query, {**fields, "id": row_id})
         return cur.rowcount
 
 

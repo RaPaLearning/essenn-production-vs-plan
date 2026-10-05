@@ -20,27 +20,7 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_ROOT / ".env")
 
-_TIME_RE = re.compile(r"(\d+)\s*Hours?\s+(\d+(?:\.\d+)?)\s*Mins?", re.IGNORECASE)
-
-
-def _parse_time_str(text: str) -> float | None:
-    m = _TIME_RE.search(text)
-    if m:
-        return round((float(m.group(1)) * 60.0 + float(m.group(2))) * 60.0, 3)
-    try:
-        return round(float(text) * 60.0, 3)
-    except ValueError:
-        return None
-
-
-def time_to_seconds(raw: object) -> float | None:
-    """Convert '1 Hours 02.5000 Mins' or numeric string to seconds."""
-    if raw is None or (isinstance(raw, float) and pd.isna(raw)):
-        return None
-    text = str(raw).strip()
-    if text.lower() in ("unspecified", "nan", "", "none"):
-        return None
-    return _parse_time_str(text)
+from db.pg_masterlist import time_to_seconds
 
 
 def clean_str(val: object) -> str | None:
@@ -137,11 +117,11 @@ def upload_main_sheet(conn: psycopg.Connection[Any], xl: pd.ExcelFile) -> int:
             "setup_sec",
             "ct_sec",
         ]
-        col_names = ", ".join(cols)
-        placeholders = ", ".join(f"%({c})s" for c in cols)
-        cur.executemany(
-            f"INSERT INTO public.masterlist ({col_names}) VALUES ({placeholders})", rows
-        )
+        from psycopg.sql import SQL, Identifier, Placeholder
+        cols_sql = SQL(", ").join(map(Identifier, cols))
+        placeholders_sql = SQL(", ").join(Placeholder(c) for c in cols)
+        query = SQL("INSERT INTO public.masterlist ({}) VALUES ({})").format(cols_sql, placeholders_sql)
+        cur.executemany(query, rows)
 
     print(f"Uploaded {len(rows)} rows into public.masterlist")
     return len(rows)
@@ -175,9 +155,11 @@ def upload_machine_list(conn: psycopg.Connection[Any], xl: pd.ExcelFile) -> int:
     with conn.transaction(), conn.cursor() as cur:
         cur.execute("DELETE FROM public.machines")
         cols = ["excel_row", "sl_no", "machine", "main_group", "sub_group"]
-        col_names = ", ".join(cols)
-        placeholders = ", ".join(f"%({c})s" for c in cols)
-        cur.executemany(f"INSERT INTO public.machines ({col_names}) VALUES ({placeholders})", rows)
+        from psycopg.sql import SQL, Identifier, Placeholder
+        cols_sql = SQL(", ").join(map(Identifier, cols))
+        placeholders_sql = SQL(", ").join(Placeholder(c) for c in cols)
+        query = SQL("INSERT INTO public.machines ({}) VALUES ({})").format(cols_sql, placeholders_sql)
+        cur.executemany(query, rows)
 
     print(f"Uploaded {len(rows)} rows into public.machines")
     return len(rows)
@@ -226,11 +208,11 @@ def upload_template_sheet(conn: psycopg.Connection[Any], xl: pd.ExcelFile) -> in
             "ct_sec",
             "resource",
         ]
-        col_names = ", ".join(cols)
-        placeholders = ", ".join(f"%({c})s" for c in cols)
-        cur.executemany(
-            f"INSERT INTO public.masterlist_template ({col_names}) VALUES ({placeholders})", rows
-        )
+        from psycopg.sql import SQL, Identifier, Placeholder
+        cols_sql = SQL(", ").join(map(Identifier, cols))
+        placeholders_sql = SQL(", ").join(Placeholder(c) for c in cols)
+        query = SQL("INSERT INTO public.masterlist_template ({}) VALUES ({})").format(cols_sql, placeholders_sql)
+        cur.executemany(query, rows)
 
     print(f"Uploaded {len(rows)} rows into public.masterlist_template")
     return len(rows)
