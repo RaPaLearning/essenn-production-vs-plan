@@ -445,3 +445,4 @@ def export_active_jobs(
     _fill_shift_sheet(ws_shift_c, "C", target_date, rows_c, anom_c)
 
     wb.save(output_path)  # type: ignore[reportUnknownMemberType]
+    wb.close()  # type: ignore[reportUnknownMemberType]

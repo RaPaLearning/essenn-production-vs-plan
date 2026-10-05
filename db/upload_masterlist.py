@@ -38,6 +38,8 @@ def upload_masterlist(file_path: str) -> int:
     print(f"Uploading {len(all_data)} rows to Supabase...")
 
     try:
+        # Wipe existing data so deleted Excel rows don't stay orphaned
+        supabase.table("masterlist").delete().neq("id", 0).execute()
         res = supabase.table("masterlist").insert(all_data).execute()
         print("Upload complete!")
         return len(res.data)

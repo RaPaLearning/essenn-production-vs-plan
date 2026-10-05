@@ -1,4 +1,4 @@
-CREATE TABLE public.masterlist (
+CREATE TABLE IF NOT EXISTS public.masterlist (
     id SERIAL PRIMARY KEY,
     part_no TEXT NOT NULL,
     part_name TEXT,

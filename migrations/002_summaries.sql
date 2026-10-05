@@ -1,4 +1,4 @@
-CREATE TABLE public.summaries (
+CREATE TABLE IF NOT EXISTS public.summaries (
     id SERIAL PRIMARY KEY,
     date DATE NOT NULL,
     shift TEXT NOT NULL,
