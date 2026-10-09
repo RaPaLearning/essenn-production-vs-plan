@@ -1,8 +1,8 @@
 """Test database functions against a real Supabase instance."""
 
 import os
+from typing import Any, cast
 import unittest
-from typing import Any
 from unittest.mock import patch, MagicMock
 import sys
 from pathlib import Path
@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 
 from db.save_summaries import save_report_summaries  # type: ignore[reportUnknownVariableType]
-from db.upload_masterlist import upload_masterlist, _build_row
+from db.upload_masterlist import upload_masterlist, _build_row  # pyright: ignore[reportPrivateUsage]
 from db.get_masterlist import get_masterlist
 import run_migrations
 
@@ -101,19 +101,19 @@ class TestParseInt(unittest.TestCase):
     """Test the _parse_int helper."""
 
     def test_digit(self) -> None:
-        from db.save_summaries import _parse_int
+        from db.save_summaries import _parse_int  # pyright: ignore[reportPrivateUsage]
 
-        self.assertEqual(_parse_int({"k": "42"}, "k"), 42)
+        self.assertEqual(_parse_int({"k": "42"}, "k"), 42)  # pyright: ignore[reportPrivateUsage]
 
     def test_non_digit(self) -> None:
-        from db.save_summaries import _parse_int
+        from db.save_summaries import _parse_int  # pyright: ignore[reportPrivateUsage]
 
-        self.assertIsNone(_parse_int({"k": "abc"}, "k"))
+        self.assertIsNone(_parse_int({"k": "abc"}, "k"))  # pyright: ignore[reportPrivateUsage]
 
     def test_missing_key(self) -> None:
-        from db.save_summaries import _parse_int
+        from db.save_summaries import _parse_int  # pyright: ignore[reportPrivateUsage]
 
-        self.assertIsNone(_parse_int({}, "k"))
+        self.assertIsNone(_parse_int({}, "k"))  # pyright: ignore[reportPrivateUsage]
 
 
 class TestDbClient(unittest.TestCase):
@@ -168,7 +168,7 @@ class TestDbClient(unittest.TestCase):
 # Integration tests — run against real test Supabase
 # ---------------------------------------------------------------------------
 
-_test_client = _get_test_client()
+_test_client = cast(Any, _get_test_client())
 _skip_reason = "TEST_SUPABASE_URL/KEY not set"
 
 
@@ -177,12 +177,10 @@ class TestTablesExist(unittest.TestCase):
     """Verify that the expected tables exist in the test database."""
 
     def test_masterlist_table_exists(self) -> None:
-        if _test_client is None: raise RuntimeError("Client not initialized")
         res = _test_client.table("masterlist").select("*").limit(1).execute()
         self.assertIsInstance(res.data, list)
 
     def test_summaries_table_exists(self) -> None:
-        if _test_client is None: raise RuntimeError("Client not initialized")
         res = _test_client.table("summaries").select("*").limit(1).execute()
         self.assertIsInstance(res.data, list)
 
@@ -192,11 +190,13 @@ class TestUploadMasterlistIntegration(unittest.TestCase):
     """Test uploading masterlist data to a real database."""
 
     def setUp(self) -> None:
-        if _test_client is None: raise RuntimeError("Client not initialized")
         _wipe_table(_test_client, "masterlist")
 
+    def _fetch_masterlist_rows(self) -> list[dict[str, Any]]:
+        res = _test_client.table("masterlist").select("*").execute()
+        return [cast(dict[str, Any], r) for r in res.data]
+
     def test_upload_inserts_real_data(self) -> None:
-        if _test_client is None: raise RuntimeError("Client not initialized")
         # Point the module's client at our test database
         with patch("db.upload_masterlist.supabase", _test_client):
             import pandas as pd
@@ -217,15 +217,14 @@ class TestUploadMasterlistIntegration(unittest.TestCase):
 
         self.assertEqual(count, 1)
         # Read back from DB and verify
-        res = _test_client.table("masterlist").select("*").execute()
-        self.assertEqual(len(res.data), 1)
-        self.assertEqual(res.data[0]["part_no"], "P1")
-        self.assertEqual(res.data[0]["part_name"], "Name1")
-        self.assertEqual(float(res.data[0]["ct_sec"]), 10.5)
+        rows = self._fetch_masterlist_rows()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["part_no"], "P1")
+        self.assertEqual(rows[0]["part_name"], "Name1")
+        self.assertEqual(float(rows[0]["ct_sec"]), 10.5)
 
     def test_upload_replaces_old_data(self) -> None:
         """Uploading again should wipe old rows (handles deleted Excel rows)."""
-        if _test_client is None: raise RuntimeError("Client not initialized")
         import pandas as pd
 
         df1 = pd.DataFrame(
@@ -250,9 +249,9 @@ class TestUploadMasterlistIntegration(unittest.TestCase):
             with patch("pandas.read_excel", return_value=df2):
                 upload_masterlist("fake.xlsx")
 
-        res = _test_client.table("masterlist").select("*").execute()
-        self.assertEqual(len(res.data), 1)
-        self.assertEqual(res.data[0]["part_no"], "P1")
+        rows = self._fetch_masterlist_rows()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["part_no"], "P1")
 
 
 @unittest.skipUnless(_test_client, _skip_reason)
@@ -260,17 +259,16 @@ class TestSaveSummariesIntegration(unittest.TestCase):
     """Test saving summaries to a real database."""
 
     def setUp(self) -> None:
-        if _test_client is None: raise RuntimeError("Client not initialized")
         _wipe_table(_test_client, "summaries")
 
     def _save_and_fetch(self, rows: list[dict[str, str]]) -> list[dict[str, Any]]:
-        if _test_client is None: raise RuntimeError("Client not initialized")
         with patch("db.save_summaries.supabase", _test_client):
             save_report_summaries("2026-10-04", rows, [])
-        return _test_client.table("summaries").select("*").execute().data
+        return cast(
+            list[dict[str, Any]], _test_client.table("summaries").select("*").execute().data
+        )
 
     def test_save_inserts_real_data(self) -> None:
-        if _test_client is None: raise RuntimeError("Client not initialized")
         rows: list[dict[str, str]] = [
             {
                 "Shift": "Shift A",
@@ -291,7 +289,6 @@ class TestSaveSummariesIntegration(unittest.TestCase):
         self.assertEqual(data[0]["ok_qty"], 40)
 
     def test_save_non_digit_fields(self) -> None:
-        if _test_client is None: raise RuntimeError("Client not initialized")
         rows: list[dict[str, str]] = [
             {
                 "Shift": "A",
@@ -316,11 +313,9 @@ class TestGetMasterlistIntegration(unittest.TestCase):
     """Test retrieving masterlist from a real database."""
 
     def setUp(self) -> None:
-        if _test_client is None: raise RuntimeError("Client not initialized")
         _wipe_table(_test_client, "masterlist")
 
     def test_get_returns_data(self) -> None:
-        if _test_client is None: raise RuntimeError("Client not initialized")
         # Insert a row directly
         _test_client.table("masterlist").insert(
             {
@@ -341,7 +336,6 @@ class TestGetMasterlistIntegration(unittest.TestCase):
         self.assertEqual(df.iloc[0]["part_no"], "P1")
 
     def test_get_empty_table(self) -> None:
-        if _test_client is None: raise RuntimeError("Client not initialized")
         with patch("db.get_masterlist.supabase", _test_client):
             df = get_masterlist()
         self.assertEqual(len(df), 0)
@@ -463,7 +457,7 @@ class TestRunMigrations(unittest.TestCase):
     @patch("supabase.create_client")
     @patch("tests.test_db.create_client")
     def test_get_test_client_with_env(
-        self, mock_create2: MagicMock, mock_create1: MagicMock
+        self, _mock_create2: MagicMock, _mock_create1: MagicMock
     ) -> None:
         with patch.dict(
             os.environ, {"TEST_SUPABASE_URL": "http://test", "TEST_SUPABASE_KEY": "key"}

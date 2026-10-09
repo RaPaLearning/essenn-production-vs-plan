@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from db.pg_masterlist import (
     time_to_seconds,
-    _clean_op_no,
+    _clean_op_no,  # pyright: ignore[reportPrivateUsage]
     parse_masterlist_excel,
     get_connection,
     ensure_schema,
@@ -20,7 +20,7 @@ from db.pg_masterlist import (
     count_rows,
     update_row,
     delete_row,
-    _demo_crud,
+    _demo_crud,  # pyright: ignore[reportPrivateUsage]
     main as pg_main,
 )
 from db.upload_all_masterlists import (
@@ -157,8 +157,8 @@ class TestPgMasterlistFunctions(unittest.TestCase):
         mock_demo_crud: MagicMock,
         mock_count: MagicMock,
         mock_create: MagicMock,
-        mock_ensure: MagicMock,
-        mock_get_conn: MagicMock,
+        _mock_ensure: MagicMock,
+        _mock_get_conn: MagicMock,
         mock_parse: MagicMock,
     ) -> None:
         mock_parse.return_value = [{"part_no": "P1"}]
@@ -218,7 +218,7 @@ class TestUploadAllMasterlists(unittest.TestCase):
             }
         )
 
-        def mock_parse(sheet_name: str, **kwargs: object) -> pd.DataFrame:
+        def mock_parse(sheet_name: str, **_kwargs: object) -> pd.DataFrame:
             if sheet_name == "As on 16-05-2026":
                 return df_main
             if sheet_name == "Machine list":
@@ -239,10 +239,10 @@ class TestUploadAllMasterlists(unittest.TestCase):
     @patch("db.upload_all_masterlists.upload_template_sheet")
     def test_upload_all_main(
         self,
-        mock_templ: MagicMock,
-        mock_mach: MagicMock,
+        _mock_templ: MagicMock,
+        _mock_mach: MagicMock,
         mock_main_sheet: MagicMock,
-        mock_apply: MagicMock,
+        _mock_apply: MagicMock,
         mock_conn: MagicMock,
         mock_excel: MagicMock,
     ) -> None:
@@ -289,7 +289,7 @@ class TestUploadAllMasterlists(unittest.TestCase):
             ]
         )
 
-        def mock_parse(sheet_name: str, **kwargs: object) -> pd.DataFrame:
+        def mock_parse(sheet_name: str, **_kwargs: object) -> pd.DataFrame:
             if sheet_name == "As on 16-05-2026":
                 return df_main_empty
             return df_machine_empty
@@ -328,7 +328,7 @@ class TestUploadAllMasterlists(unittest.TestCase):
     @patch("db.upload_all_masterlists.upload_main_sheet")
     @patch("db.upload_all_masterlists.upload_machine_list")
     @patch("db.upload_all_masterlists.upload_template_sheet")
-    def test_upload_all_cli_entrypoint(self, *mocks: MagicMock) -> None:
+    def test_upload_all_cli_entrypoint(self, *_mocks: MagicMock) -> None:
         import runpy
 
         with patch.object(sys, "argv", ["upload_all_masterlists.py"]):
@@ -343,7 +343,7 @@ class TestUploadAllMasterlists(unittest.TestCase):
         self,
         mock_count: MagicMock,
         mock_create: MagicMock,
-        mock_ensure: MagicMock,
+        _mock_ensure: MagicMock,
         mock_conn: MagicMock,
         mock_read: MagicMock,
     ) -> None:

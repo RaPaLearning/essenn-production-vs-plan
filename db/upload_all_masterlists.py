@@ -7,7 +7,6 @@ Sheets handled:
 """
 
 import os
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -16,11 +15,12 @@ import pandas as pd
 
 import psycopg
 from dotenv import load_dotenv
+from psycopg.sql import SQL, Identifier, Placeholder
+
+from db.pg_masterlist import time_to_seconds
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_ROOT / ".env")
-
-from db.pg_masterlist import time_to_seconds
 
 
 def clean_str(val: object) -> str | None:
@@ -34,7 +34,7 @@ def clean_int(val: object) -> int | None:
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return None
     try:
-        return int(float(val))
+        return int(float(str(val)))
     except (ValueError, TypeError):
         return None
 
@@ -65,8 +65,25 @@ def apply_migrations(conn: psycopg.Connection[Any]) -> None:
         for sql_file in sql_files:
             print(f"Applying migration: {sql_file.name}")
             sql = sql_file.read_text(encoding="utf-8")
-            cur.execute(sql)
+            cur.execute(SQL(sql))  # type: ignore[reportArgumentType]
     conn.commit()
+
+
+def _replace_table(conn: psycopg.Connection[Any], table: str, rows: list[dict[str, Any]]) -> int:
+    """Delete all rows from public.<table> and bulk insert `rows`."""
+    target = Identifier("public", table)
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute(SQL("DELETE FROM {}").format(target))
+        if rows:
+            cols = list(rows[0].keys())
+            query = SQL("INSERT INTO {} ({}) VALUES ({})").format(
+                target,
+                SQL(", ").join(map(Identifier, cols)),
+                SQL(", ").join(map(Placeholder, cols)),
+            )
+            cur.executemany(query, rows)
+    print(f"Uploaded {len(rows)} rows into public.{table}")
+    return len(rows)
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +109,7 @@ def upload_main_sheet(conn: psycopg.Connection[Any], xl: pd.ExcelFile) -> int:
 
         rows.append(
             {
-                "excel_row": int(idx) + 2,  # 1-indexed Excel row (header is row 1)
+                "excel_row": int(str(idx)) + 2,  # 1-indexed Excel row (header is row 1)
                 "part_no": part_no or "",
                 "part_name": clean_str(r.get("Product")),
                 "operation_no": clean_op_no(r.get("Op. No.")),
@@ -104,27 +121,7 @@ def upload_main_sheet(conn: psycopg.Connection[Any], xl: pd.ExcelFile) -> int:
             }
         )
 
-    with conn.transaction(), conn.cursor() as cur:
-        cur.execute("DELETE FROM public.masterlist")
-        cols = [
-            "excel_row",
-            "part_no",
-            "part_name",
-            "operation_no",
-            "operation_name",
-            "setup_time_raw",
-            "op_time_raw",
-            "setup_sec",
-            "ct_sec",
-        ]
-        from psycopg.sql import SQL, Identifier, Placeholder
-        cols_sql = SQL(", ").join(map(Identifier, cols))
-        placeholders_sql = SQL(", ").join(Placeholder(c) for c in cols)
-        query = SQL("INSERT INTO public.masterlist ({}) VALUES ({})").format(cols_sql, placeholders_sql)
-        cur.executemany(query, rows)
-
-    print(f"Uploaded {len(rows)} rows into public.masterlist")
-    return len(rows)
+    return _replace_table(conn, "masterlist", rows)
 
 
 # ---------------------------------------------------------------------------
@@ -144,7 +141,7 @@ def upload_machine_list(conn: psycopg.Connection[Any], xl: pd.ExcelFile) -> int:
 
         rows.append(
             {
-                "excel_row": int(idx) + 7,
+                "excel_row": int(str(idx)) + 7,
                 "sl_no": sl_no,
                 "machine": machine,
                 "main_group": clean_str(r.iloc[3]),
@@ -152,17 +149,7 @@ def upload_machine_list(conn: psycopg.Connection[Any], xl: pd.ExcelFile) -> int:
             }
         )
 
-    with conn.transaction(), conn.cursor() as cur:
-        cur.execute("DELETE FROM public.machines")
-        cols = ["excel_row", "sl_no", "machine", "main_group", "sub_group"]
-        from psycopg.sql import SQL, Identifier, Placeholder
-        cols_sql = SQL(", ").join(map(Identifier, cols))
-        placeholders_sql = SQL(", ").join(Placeholder(c) for c in cols)
-        query = SQL("INSERT INTO public.machines ({}) VALUES ({})").format(cols_sql, placeholders_sql)
-        cur.executemany(query, rows)
-
-    print(f"Uploaded {len(rows)} rows into public.machines")
-    return len(rows)
+    return _replace_table(conn, "machines", rows)
 
 
 # ---------------------------------------------------------------------------
@@ -179,7 +166,7 @@ def upload_template_sheet(conn: psycopg.Connection[Any], xl: pd.ExcelFile) -> in
 
         rows.append(
             {
-                "excel_row": int(idx) + 2,
+                "excel_row": int(str(idx)) + 2,
                 "sl_no": clean_int(r.get("SL No")),
                 "part_no": clean_str(r.get("Part No.")),
                 "product": clean_str(r.get("Product")),
@@ -193,29 +180,7 @@ def upload_template_sheet(conn: psycopg.Connection[Any], xl: pd.ExcelFile) -> in
             }
         )
 
-    with conn.transaction(), conn.cursor() as cur:
-        cur.execute("DELETE FROM public.masterlist_template")
-        cols = [
-            "excel_row",
-            "sl_no",
-            "part_no",
-            "product",
-            "operation_no",
-            "operation_name",
-            "setup_time_raw",
-            "op_time_raw",
-            "setup_sec",
-            "ct_sec",
-            "resource",
-        ]
-        from psycopg.sql import SQL, Identifier, Placeholder
-        cols_sql = SQL(", ").join(map(Identifier, cols))
-        placeholders_sql = SQL(", ").join(Placeholder(c) for c in cols)
-        query = SQL("INSERT INTO public.masterlist_template ({}) VALUES ({})").format(cols_sql, placeholders_sql)
-        cur.executemany(query, rows)
-
-    print(f"Uploaded {len(rows)} rows into public.masterlist_template")
-    return len(rows)
+    return _replace_table(conn, "masterlist_template", rows)
 
 
 def main(file_path: str) -> None:

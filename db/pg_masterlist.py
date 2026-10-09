@@ -13,12 +13,13 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast, LiteralString
 
 import pandas as pd
 from dotenv import load_dotenv
 
 import psycopg
+import psycopg.rows
 
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -104,18 +105,30 @@ def get_connection() -> Any:
 
 def ensure_schema(conn: psycopg.Connection[Any]) -> None:
     """Make sure the masterlist table has every column we write."""
+    from psycopg.sql import SQL
+
     with conn.cursor() as cur:
         cur.execute(
-            Path(__file__)
-            .resolve()
-            .parent.parent.joinpath("migrations", "001_masterlist.sql")
-            .read_text()
+            SQL(
+                cast(
+                    LiteralString,
+                    Path(__file__)
+                    .resolve()
+                    .parent.parent.joinpath("migrations", "001_masterlist.sql")
+                    .read_text(),
+                )
+            )
         )
         cur.execute(
-            Path(__file__)
-            .resolve()
-            .parent.parent.joinpath("migrations", "003_masterlist_excel_columns.sql")
-            .read_text()
+            SQL(
+                cast(
+                    LiteralString,
+                    Path(__file__)
+                    .resolve()
+                    .parent.parent.joinpath("migrations", "003_masterlist_excel_columns.sql")
+                    .read_text(),
+                )
+            )
         )
     conn.commit()
 
@@ -131,10 +144,11 @@ def create_rows(conn: psycopg.Connection[Any], rows: list[Row], replace: bool = 
     Runs in a single transaction, so if the insert fails the old data is kept.
     """
     from psycopg.sql import SQL, Identifier, Placeholder
+
     cols_sql = SQL(", ").join(map(Identifier, _COLUMNS))
     placeholders_sql = SQL(", ").join(Placeholder(c) for c in _COLUMNS)
     query = SQL("INSERT INTO public.masterlist ({}) VALUES ({})").format(cols_sql, placeholders_sql)
-    
+
     with conn.transaction(), conn.cursor() as cur:
         if replace:
             cur.execute("DELETE FROM public.masterlist")
@@ -147,9 +161,10 @@ def read_rows(
 ) -> list[Row]:
     """READ: fetch rows, optionally filtered by part_no."""
     from psycopg.sql import SQL, Identifier
+
     cols_sql = SQL(", ").join(map(Identifier, _COLUMNS))
     query = SQL("SELECT id, {} FROM public.masterlist").format(cols_sql)
-    
+
     params: list[Any] = []
     if part_no is not None:
         query += SQL(" WHERE part_no = %s")
@@ -158,9 +173,9 @@ def read_rows(
     if limit is not None:
         query += SQL(" LIMIT %s")
         params.append(limit)
-    with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
+    with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:  # type: ignore[reportUnknownMemberType,reportUnknownArgumentType]
         cur.execute(query, params)
-        return list(cur.fetchall())
+        return list(cur.fetchall())  # type: ignore[reportUnknownArgumentType]
 
 
 def count_rows(conn: psycopg.Connection[Any]) -> int:
@@ -179,6 +194,7 @@ def update_row(conn: psycopg.Connection[Any], row_id: int, **fields: Any) -> int
     if not fields:
         return 0
     from psycopg.sql import SQL, Identifier, Placeholder
+
     assignments = SQL(", ").join(
         SQL("{} = {}").format(Identifier(c), Placeholder(c)) for c in fields
     )
