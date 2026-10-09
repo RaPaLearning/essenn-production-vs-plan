@@ -67,13 +67,8 @@ class TestApp(unittest.TestCase):
         # The main validation: check if the download button (UnknownElement subtype)
         # was appended to the bottom and it only renders if the file processing runs completely
         # without hitting earlier exceptions and correctly saves bytes to session_state.
-        has_download_button = any(
-            getattr(e, "type", type(e).__name__) == "download_button" for e in at.main
-        )
-        self.assertTrue(
-            has_download_button,
-            "Download button element was not rendered into the tree (processing failed)",
-        )
+        err_msg = f"Download button missing. Page errors: {[e.value for e in at.error]}"
+        self.assertGreater(len(at.download_button), 0, err_msg)
 
         # Verify the preview subheader and dataframe element are rendered successfully
         self.assertGreater(len(at.subheader), 0, "Preview subheader should be rendered")

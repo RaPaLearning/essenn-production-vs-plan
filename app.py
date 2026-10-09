@@ -25,7 +25,10 @@ def _process_upload(
     selected_date: date,
 ) -> bytes:
     """Process the uploaded XLSX and return the output Excel bytes."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    base_dir = Path(__file__).parent / ".temp_build"
+    base_dir.mkdir(exist_ok=True)
+    tmpdir = tempfile.mkdtemp(dir=base_dir)
+    try:
         input_path = Path(tmpdir) / "input.xlsx"
         output_path = Path(tmpdir) / "output.xlsx"
 
@@ -40,6 +43,10 @@ def _process_upload(
         )
 
         return output_path.read_bytes()
+    finally:
+        import shutil
+
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def _extractor_page() -> None:
